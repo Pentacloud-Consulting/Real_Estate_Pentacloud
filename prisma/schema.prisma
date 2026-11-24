@@ -1,0 +1,958 @@
+// Pentacloud Real Estate Platform - Prisma Schema
+// Using SQLite for local development, PostgreSQL for production
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== USERS & AUTH ====================
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  passwordHash  String
+  firstName     String
+  lastName      String
+  phone         String?
+  avatar        String?
+  role          String   @default("SALES_ADVISOR") // SUPER_ADMIN, ADMIN, SALES_MANAGER, SALES_ADVISOR, FINANCE, COMPLIANCE, MANAGEMENT
+  isActive      Boolean  @default(true)
+  lastLoginAt   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  assignedLeads       Lead[]             @relation("AssignedAdvisor")
+  managedLeads        Lead[]             @relation("SalesManager")
+  createdLeads        Lead[]             @relation("CreatedBy")
+  activities          Activity[]
+  notifications       Notification[]
+  auditLogs           AuditLog[]
+  createdBuyers       BuyerAccount[]     @relation("CreatedByUser")
+  assignedBuyers      BuyerAccount[]     @relation("RelationshipManager")
+  assignedContacts    Contact[]          @relation("ContactOwner")
+  createdContacts     Contact[]          @relation("ContactCreatedBy")
+  createdOpportunities Opportunity[]     @relation("CreatedByUser")
+  assignedOpportunities Opportunity[]    @relation("AssignedAdvisor")
+  managedOpportunities Opportunity[]     @relation("OpportunitySalesManager")
+  createdEois         EOI[]              @relation("CreatedByUser")
+  verifiedPayments    EOI[]              @relation("VerifiedByUser")
+  createdQuotations   Quotation[]        @relation("CreatedByUser")
+  approvedQuotations  Quotation[]        @relation("ApprovedByUser")
+  createdPOs          PurchaseOrder[]    @relation("CreatedByUser")
+  approvedPOs         PurchaseOrder[]    @relation("ApprovedByUser")
+  documentVerifications DocumentVerification[]
+  followUps           FollowUp[]
+
+  @@index([email])
+  @@index([role])
+}
+
+// ==================== LEADS ====================
+
+model Lead {
+  id                  String   @id @default(cuid())
+  leadNumber          String   @unique
+  
+  // Contact Info
+  firstName           String
+  lastName            String
+  salutation          String?  // Mr., Ms., Mrs., Dr.
+  company             String?  // Company Name
+  title               String?  // Job Title
+  email               String?
+  mobile              String
+  whatsapp            String?
+  nationality         String?
+  countryOfResidence  String?
+  preferredLanguage   String?
+  buyerType           String?  // INDIVIDUAL, CORPORATE
+  rating              String?  @default("WARM") // HOT, WARM, COLD
+  industry            String?
+  annualRevenue       Float?
+  employees           Int?
+  website             String?
+
+  // Address
+  street              String?
+  city                String?
+  state               String?
+  country             String?
+  postalCode          String?
+  
+  // Property Preferences
+  projectId           String?
+  unitId              String?
+  interestedProject   String?
+  propertyType        String?  // APARTMENT, TOWNHOUSE, PENTHOUSE, VILLA, COMMERCIAL
+  bedroomCount        String?
+  preferredFloor      String?
+  preferredView       String?
+  budgetMin           Float?
+  budgetMax           Float?
+  purchasePurpose     String?  // INVESTMENT, END_USE, BOTH
+  preferredPaymentPlan String?
+  expectedTimeline    String?
+  
+  // Qualification
+  status              String   @default("NEW") // NEW, CONTACTED, QUALIFIED, CONVERTED, UNQUALIFIED
+  temperature         String   @default("WARM") // HOT, WARM, COLD
+  qualificationScore  Int?
+  qualificationNotes  String?
+  
+  // Source Attribution
+  source              String   @default("WEBSITE") // WEBSITE, INSTAGRAM, FACEBOOK, LINKEDIN, GOOGLE, WHATSAPP, WALK_IN, BROKER, REFERRAL, OTHER
+  brokerId            String?
+  campaignName        String?
+  campaignId          String?
+  adCreative          String?
+  landingPageUrl      String?
+  channel             String?
+  externalSourceId    String?
+  
+  // Assignment
+  assignedAdvisorId   String?
+  salesManagerId      String?
+  nextFollowUpDate    DateTime?
+  
+  // Conversion
+  isConverted         Boolean  @default(false)
+  convertedBuyerId    String?
+  convertedContactId  String?
+  convertedAccountId  String?
+  convertedOpportunityId String?
+  convertedAt         DateTime?
+  
+  // Soft delete
+  isArchived          Boolean  @default(false)
+  archivedAt          DateTime?
+  
+  createdById         String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  // Relations
+  assignedAdvisor     User?        @relation("AssignedAdvisor", fields: [assignedAdvisorId], references: [id])
+  salesManager        User?        @relation("SalesManager", fields: [salesManagerId], references: [id])
+  createdBy           User?        @relation("CreatedBy", fields: [createdById], references: [id])
+  broker              Broker?      @relation(fields: [brokerId], references: [id])
+  project             Project?     @relation(fields: [projectId], references: [id])
+  unit                Unit?        @relation(fields: [unitId], references: [id])
+  activities          Activity[]
+  followUps           FollowUp[]
+  convertedBuyer      BuyerAccount? @relation("ConvertedFromLead", fields: [convertedBuyerId], references: [id])
+  convertedContact    Contact?      @relation("LeadConvertedContact", fields: [convertedContactId], references: [id])
+
+  @@index([status])
+  @@index([temperature])
+  @@index([source])
+  @@index([brokerId])
+  @@index([projectId])
+  @@index([unitId])
+  @@index([assignedAdvisorId])
+  @@index([mobile])
+  @@index([email])
+  @@index([isArchived])
+  @@index([createdAt])
+}
+
+// ==================== ACTIVITIES & FOLLOW-UPS ====================
+
+model Activity {
+  id              String   @id @default(cuid())
+  type            String   // CALL, EMAIL, WHATSAPP, NOTE, MEETING, SITE_VISIT, FOLLOW_UP, STATUS_CHANGE, ASSIGNMENT, EOI_EVENT, RESERVATION_EVENT, PAYMENT_EVENT, DOCUMENT_EVENT, SYSTEM
+  subject         String
+  description     String?
+  
+  // Related entities
+  leadId          String?
+  buyerId         String?
+  opportunityId   String?
+  contactId       String?
+  projectId       String?
+  unitId          String?
+  eoiId           String?
+  purchaseOrderId String?
+  
+  // Metadata
+  previousValue   String?
+  newValue        String?
+  
+  createdById     String
+  createdAt       DateTime @default(now())
+
+  // Relations
+  lead            Lead?          @relation(fields: [leadId], references: [id])
+  buyer           BuyerAccount?  @relation(fields: [buyerId], references: [id])
+  opportunity     Opportunity?   @relation(fields: [opportunityId], references: [id])
+  project         Project?       @relation(fields: [projectId], references: [id])
+  unit            Unit?          @relation(fields: [unitId], references: [id])
+  eoi             EOI?           @relation(fields: [eoiId], references: [id])
+  purchaseOrder   PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id])
+  contact         Contact?       @relation(fields: [contactId], references: [id])
+  createdBy       User           @relation(fields: [createdById], references: [id])
+
+  @@index([leadId])
+  @@index([buyerId])
+  @@index([opportunityId])
+  @@index([createdAt])
+  @@index([type])
+}
+
+model FollowUp {
+  id              String   @id @default(cuid())
+  title           String
+  description     String?
+  dueDate         DateTime
+  status          String   @default("PENDING") // PENDING, COMPLETED, CANCELLED, OVERDUE
+  priority        String   @default("MEDIUM") // HIGH, MEDIUM, LOW
+  
+  leadId          String?
+  buyerId         String?
+  opportunityId   String?
+  contactId       String?
+  
+  assignedToId    String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  completedAt     DateTime?
+
+  // Relations
+  lead            Lead?          @relation(fields: [leadId], references: [id])
+  buyer           BuyerAccount?  @relation(fields: [buyerId], references: [id])
+  opportunity     Opportunity?   @relation(fields: [opportunityId], references: [id])
+  contact         Contact?       @relation(fields: [contactId], references: [id])
+  assignedTo      User           @relation(fields: [assignedToId], references: [id])
+
+  @@index([dueDate])
+  @@index([status])
+  @@index([assignedToId])
+}
+
+// ==================== BUYER ACCOUNTS ====================
+
+model BuyerAccount {
+  id                  String   @id @default(cuid())
+  accountNumber       String   @unique
+  name                String?  // Salesforce Account Name
+  buyerType           String   @default("INDIVIDUAL") // INDIVIDUAL, CORPORATE, CUSTOMER, PROSPECT, PARTNER
+  
+  // Salesforce B2B Account Fields
+  industry            String?
+  website             String?
+  annualRevenue       Float?
+  employees           Int?
+  companySize         String?
+  ownership           String?
+  status              String   @default("ACTIVE")
+  rating              String?  // HOT, WARM, COLD
+  description         String?
+
+  // Billing Address
+  billingStreet       String?
+  billingCity         String?
+  billingState        String?
+  billingCountry      String?
+  billingPostalCode   String?
+  
+  // Individual fields
+  firstName           String?
+  lastName            String?
+  email               String?
+  mobile              String?
+  whatsapp            String?
+  nationality         String?
+  countryOfResidence  String?
+  preferredLanguage   String?
+  passportNumber      String?
+  passportExpiry      DateTime?
+  nationalId          String?
+  
+  // Address
+  addressLine1        String?
+  addressLine2        String?
+  city                String?
+  state               String?
+  country             String?
+  postalCode          String?
+  
+  // Corporate fields
+  companyName         String?
+  tradeLicenseNumber  String?
+  registrationNumber  String?
+  taxRegistration     String?
+  registeredAddress   String?
+  companyContact      String?
+  authorizedSignatory String?
+  beneficialOwners    String?  // JSON string
+  
+  // Relations
+  relationshipManagerId String?
+  convertedFromLeadId   String?
+  brokerId              String?
+  
+  createdById         String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  // Relations
+  createdBy           User?         @relation("CreatedByUser", fields: [createdById], references: [id])
+  relationshipManager User?         @relation("RelationshipManager", fields: [relationshipManagerId], references: [id])
+  broker              Broker?       @relation(fields: [brokerId], references: [id])
+  leadsConverted      Lead[]        @relation("ConvertedFromLead")
+  contacts            Contact[]
+  opportunities       Opportunity[]
+  eois                EOI[]
+  reservations        Reservation[]
+  quotations          Quotation[]
+  purchaseOrders      PurchaseOrder[]
+  onboarding          Onboarding?
+  documents           Document[]
+  activities          Activity[]
+  followUps           FollowUp[]
+
+  @@index([accountNumber])
+  @@index([buyerType])
+  @@index([brokerId])
+  @@index([email])
+  @@index([mobile])
+}
+
+// ==================== CONTACTS ====================
+
+model Contact {
+  id                  String   @id @default(cuid())
+  contactNumber       String   @unique
+  firstName           String
+  lastName            String
+  salutation          String?  // Mr., Ms., Mrs., Dr.
+  title               String?  // Job Title
+  department          String?
+  email               String?
+  phone               String?
+  mobile              String?
+  whatsapp            String?
+  leadSource          String?
+  description         String?
+  
+  // Mailing Address
+  mailingStreet       String?
+  mailingCity         String?
+  mailingState        String?
+  mailingCountry      String?
+  mailingPostalCode   String?
+  
+  accountId           String?
+  account             BuyerAccount? @relation(fields: [accountId], references: [id])
+  
+  opportunities       Opportunity[]
+  activities          Activity[]
+  followUps           FollowUp[]
+  leadsConverted      Lead[]   @relation("LeadConvertedContact")
+  
+  ownerId             String?
+  createdById         String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  owner               User?    @relation("ContactOwner", fields: [ownerId], references: [id])
+  createdBy           User?    @relation("ContactCreatedBy", fields: [createdById], references: [id])
+  
+  @@index([accountId])
+  @@index([email])
+  @@index([lastName])
+}
+
+// ==================== OPPORTUNITIES ====================
+
+model Opportunity {
+  id                  String   @id @default(cuid())
+  opportunityNumber   String   @unique
+  name                String
+  
+  buyerId             String
+  contactId           String?
+  projectId           String?
+  unitId              String?
+  
+  propertyType        String?
+  estimatedValue      Float?
+  amount              Float?
+  budget              Float?
+  probability         Int?     @default(50)
+  expectedClosingDate DateTime?
+  closeDate           DateTime?
+  
+  // Unit Showing & Financial Terms
+  scheduledVisitDate  DateTime? // Apartment visit date and time
+  paymentMethod       String?   // CASH, LOAN, MORTGAGE, BANK_TRANSFER, CASH_PLUS_LOAN, DEVELOPER_PAYMENT_PLAN
+  paymentPlan         String?   // 30/70, 40/60, 10/90, 20/80, 50/50, 60/40
+  
+  stage               String   @default("PROSPECTING") // PROSPECTING, QUALIFICATION, NEEDS_ANALYSIS, PROPOSAL, NEGOTIATION, CLOSED_WON, CLOSED_LOST
+  lostReason          String?
+  notes               String?
+  description         String?
+  
+  assignedAdvisorId   String?
+  salesManagerId      String?
+  brokerId            String?
+  
+  createdById         String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  // Relations
+  buyer               BuyerAccount   @relation(fields: [buyerId], references: [id])
+  contact             Contact?       @relation(fields: [contactId], references: [id])
+  project             Project?       @relation(fields: [projectId], references: [id])
+  unit                Unit?          @relation(fields: [unitId], references: [id])
+  assignedAdvisor     User?          @relation("AssignedAdvisor", fields: [assignedAdvisorId], references: [id])
+  salesManager        User?          @relation("OpportunitySalesManager", fields: [salesManagerId], references: [id])
+  createdBy           User?          @relation("CreatedByUser", fields: [createdById], references: [id])
+  broker              Broker?        @relation(fields: [brokerId], references: [id])
+  stageHistory        OpportunityStageHistory[]
+  eois                EOI[]
+  quotations          Quotation[]
+  purchaseOrders      PurchaseOrder[]
+  activities          Activity[]
+  followUps           FollowUp[]
+
+  @@index([stage])
+  @@index([buyerId])
+  @@index([projectId])
+  @@index([assignedAdvisorId])
+  @@index([brokerId])
+}
+
+model OpportunityStageHistory {
+  id              String   @id @default(cuid())
+  opportunityId   String
+  fromStage       String
+  toStage         String
+  changedById     String?
+  notes           String?
+  createdAt       DateTime @default(now())
+
+  opportunity     Opportunity @relation(fields: [opportunityId], references: [id])
+
+  @@index([opportunityId])
+}
+
+// ==================== PROJECTS ====================
+
+model Project {
+  id              String   @id @default(cuid())
+  name            String
+  code            String   @unique
+  developer       String?
+  description     String?
+  
+  // Location
+  location        String?
+  address         String?
+  city            String?
+  country         String?
+  
+  status          String   @default("ACTIVE") // PLANNING, PRE_LAUNCH, ACTIVE, SOLD_OUT, COMPLETED
+  launchDate      DateTime?
+  completionDate  DateTime?
+  
+  totalUnits      Int      @default(0)
+  propertyType    String?
+  priceRangeMin   Float?
+  priceRangeMax   Float?
+  amenities       String?  // JSON string
+  
+  imageUrl        String?
+  brochureUrl     String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  buildings       Building[]
+  units           Unit[]
+  leads           Lead[]
+  opportunities   Opportunity[]
+  eois            EOI[]
+  reservations    Reservation[]
+  quotations      Quotation[]
+  purchaseOrders  PurchaseOrder[]
+  activities      Activity[]
+
+  @@index([code])
+  @@index([status])
+}
+
+model Building {
+  id              String   @id @default(cuid())
+  name            String
+  projectId       String
+  totalFloors     Int      @default(1)
+  totalUnits      Int      @default(0)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  project         Project  @relation(fields: [projectId], references: [id])
+  units           Unit[]
+
+  @@index([projectId])
+}
+
+// ==================== UNITS / INVENTORY ====================
+
+model Unit {
+  id              String   @id @default(cuid())
+  unitNumber      String
+  
+  projectId       String
+  buildingId      String?
+  
+  floor           Int?
+  unitType        String   // APARTMENT, TOWNHOUSE, PENTHOUSE, VILLA, COMMERCIAL
+  bedrooms        Int?
+  bathrooms       Int?
+  area            Float?
+  areaUnit        String   @default("SQFT") // SQFT, SQM
+  view            String?
+  facing          String?
+  
+  // Pricing
+  basePrice       Float    @default(0)
+  floorPremium    Float    @default(0)
+  viewPremium     Float    @default(0)
+  additionalCharges Float  @default(0)
+  finalPrice      Float    @default(0)
+  
+  status          String   @default("AVAILABLE") // AVAILABLE, RESERVED, ON_HOLD, SOLD, BLOCKED, UNAVAILABLE
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  project         Project       @relation(fields: [projectId], references: [id])
+  building        Building?     @relation(fields: [buildingId], references: [id])
+  leads           Lead[]
+  opportunities   Opportunity[]
+  eois            EOI[]
+  reservations    Reservation[]
+  quotations      Quotation[]
+  purchaseOrders  PurchaseOrder[]
+  activities      Activity[]
+
+  @@unique([projectId, unitNumber])
+  @@index([status])
+  @@index([projectId])
+  @@index([buildingId])
+  @@index([unitType])
+  @@index([floor])
+}
+
+// ==================== EOI & RESERVATIONS ====================
+
+model EOI {
+  id                  String   @id @default(cuid())
+  eoiNumber           String   @unique
+  
+  buyerId             String
+  opportunityId       String?
+  projectId           String
+  unitId              String
+  
+  eoiDate             DateTime @default(now())
+  unitPrice           Float
+  tokenAmount         Float
+  isRefundable        Boolean  @default(false)
+  
+  paymentMethod       String?  // BANK_TRANSFER, CHEQUE, CREDIT_CARD, CASH
+  paymentReference    String?
+  paymentStatus       String   @default("PENDING") // PENDING, RECEIVED, VERIFIED, REJECTED
+  depositReceiptUrl   String?
+  
+  preferredPaymentPlan String?
+  notes               String?
+  buyerSignatureUrl   String?
+  eoiDocumentUrl      String?
+  
+  status              String   @default("DRAFT") // DRAFT, SUBMITTED, AWAITING_PAYMENT, PAYMENT_PENDING_VERIFICATION, PAYMENT_VERIFIED, RESERVATION_ACTIVE, EXPIRED, CANCELLED, CONVERTED_TO_PO
+  
+  verifiedById        String?
+  verifiedAt          DateTime?
+  
+  createdById         String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  // Relations
+  buyer               BuyerAccount   @relation(fields: [buyerId], references: [id])
+  opportunity         Opportunity?   @relation(fields: [opportunityId], references: [id])
+  project             Project        @relation(fields: [projectId], references: [id])
+  unit                Unit           @relation(fields: [unitId], references: [id])
+  verifiedBy          User?          @relation("VerifiedByUser", fields: [verifiedById], references: [id])
+  createdBy           User?          @relation("CreatedByUser", fields: [createdById], references: [id])
+  reservation         Reservation?
+  quotations          Quotation[]
+  purchaseOrders      PurchaseOrder[]
+  activities          Activity[]
+
+  @@index([status])
+  @@index([buyerId])
+  @@index([unitId])
+  @@index([projectId])
+}
+
+model Reservation {
+  id              String   @id @default(cuid())
+  reservationNumber String @unique
+  
+  buyerId         String
+  projectId       String
+  unitId          String
+  eoiId           String   @unique
+  
+  reservationDate DateTime @default(now())
+  expiryDate      DateTime
+  tokenAmount     Float
+  
+  paymentStatus   String   @default("PENDING") // PENDING, VERIFIED, CONFIRMED
+  status          String   @default("ACTIVE") // ACTIVE, EXPIRED, CANCELLED, CONVERTED
+  
+  assignedAdvisorId String?
+  notes           String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  buyer           BuyerAccount @relation(fields: [buyerId], references: [id])
+  project         Project      @relation(fields: [projectId], references: [id])
+  unit            Unit         @relation(fields: [unitId], references: [id])
+  eoi             EOI          @relation(fields: [eoiId], references: [id])
+
+  @@index([status])
+  @@index([buyerId])
+  @@index([unitId])
+  @@index([expiryDate])
+}
+
+// ==================== QUOTATIONS ====================
+
+model Quotation {
+  id                  String   @id @default(cuid())
+  quotationNumber     String   @unique
+  version             Int      @default(1)
+  
+  buyerId             String
+  projectId           String
+  unitId              String
+  opportunityId       String?
+  eoiId               String?
+  
+  basePrice           Float
+  floorPremium        Float    @default(0)
+  viewPremium         Float    @default(0)
+  otherFees           Float    @default(0)
+  discount            Float    @default(0)
+  discountType        String?  @default("FIXED") // PERCENTAGE, FIXED
+  discountValue       Float?   @default(0)
+  paymentPlan         String?
+  tax                 Float    @default(0)
+  finalPrice          Float
+  currency            String   @default("AED")
+  
+  validUntil          DateTime?
+  notes               String?
+  termsConditions     String?
+  
+  status              String   @default("DRAFT") // DRAFT, PENDING_APPROVAL, APPROVED, SENT, ACCEPTED, REJECTED, EXPIRED
+  
+  approvedById        String?
+  approvedAt          DateTime?
+  createdById         String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  // Relations
+  buyer               BuyerAccount   @relation(fields: [buyerId], references: [id])
+  project             Project        @relation(fields: [projectId], references: [id])
+  unit                Unit           @relation(fields: [unitId], references: [id])
+  opportunity         Opportunity?   @relation(fields: [opportunityId], references: [id])
+  eoi                 EOI?           @relation(fields: [eoiId], references: [id])
+  approvedBy          User?          @relation("ApprovedByUser", fields: [approvedById], references: [id])
+  createdBy           User?          @relation("CreatedByUser", fields: [createdById], references: [id])
+  paymentMilestones   PaymentMilestone[]
+  purchaseOrders      PurchaseOrder[]
+
+  @@index([status])
+  @@index([buyerId])
+  @@index([unitId])
+}
+
+model PaymentMilestone {
+  id              String   @id @default(cuid())
+  quotationId     String
+  
+  name            String
+  percentage      Float
+  amount          Float
+  dueDate         DateTime?
+  status          String   @default("PENDING") // PENDING, INVOICED, PAID, OVERDUE
+  paymentReference String?
+  receiptUrl      String?
+  sortOrder       Int      @default(0)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  quotation       Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+
+  @@index([quotationId])
+}
+
+// ==================== PURCHASE ORDERS ====================
+
+model PurchaseOrder {
+  id                  String   @id @default(cuid())
+  poNumber            String   @unique
+  
+  buyerId             String
+  projectId           String
+  unitId              String
+  opportunityId       String?
+  quotationId         String?
+  eoiId               String?
+  
+  unitPrice           Float
+  discount            Float    @default(0)
+  additionalCharges   Float    @default(0)
+  finalAmount         Float
+  downPayment         Float    @default(0)
+  paymentPlan         String?
+  
+  purchaseDate        DateTime @default(now())
+  status              String   @default("DRAFT") // DRAFT, AWAITING_APPROVAL, APPROVED, SENT, AWAITING_SIGNATURE, SIGNED, PAYMENT_PENDING, CONFIRMED, CLOSED_WON, CANCELLED
+  
+  buyerSignatureUrl   String?
+  sellerSignatureUrl  String?
+  
+  approvedById        String?
+  approvedAt          DateTime?
+  confirmedAt         DateTime?
+  
+  notes               String?
+  
+  createdById         String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  // Relations
+  buyer               BuyerAccount   @relation(fields: [buyerId], references: [id])
+  project             Project        @relation(fields: [projectId], references: [id])
+  unit                Unit           @relation(fields: [unitId], references: [id])
+  opportunity         Opportunity?   @relation(fields: [opportunityId], references: [id])
+  quotation           Quotation?     @relation(fields: [quotationId], references: [id])
+  eoi                 EOI?           @relation(fields: [eoiId], references: [id])
+  approvedBy          User?          @relation("ApprovedByUser", fields: [approvedById], references: [id])
+  createdBy           User?          @relation("CreatedByUser", fields: [createdById], references: [id])
+  activities          Activity[]
+
+  @@index([status])
+  @@index([buyerId])
+  @@index([unitId])
+}
+
+// ==================== ONBOARDING & DOCUMENTS ====================
+
+model Onboarding {
+  id                  String   @id @default(cuid())
+  onboardingNumber    String   @unique
+  
+  buyerId             String   @unique
+  buyerCategory       String   // INDIVIDUAL_RESIDENT, INDIVIDUAL_INTERNATIONAL, CORPORATE
+  
+  status              String   @default("NOT_STARTED") // NOT_STARTED, IN_PROGRESS, PENDING_REVIEW, COMPLETED
+  completionPercentage Float   @default(0)
+  
+  reviewerId          String?
+  submissionDate      DateTime?
+  completionDate      DateTime?
+  notes               String?
+  
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  // Relations
+  buyer               BuyerAccount   @relation(fields: [buyerId], references: [id])
+  checklistItems      OnboardingChecklist[]
+
+  @@index([status])
+  @@index([buyerId])
+}
+
+model OnboardingChecklist {
+  id              String   @id @default(cuid())
+  onboardingId    String
+  
+  documentName    String
+  description     String?
+  isRequired      Boolean  @default(true)
+  sortOrder       Int      @default(0)
+  
+  status          String   @default("PENDING_UPLOAD") // PENDING_UPLOAD, UPLOADED, UNDER_REVIEW, VERIFIED, REJECTED, EXPIRED, RESUBMISSION_REQUIRED
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  onboarding      Onboarding @relation(fields: [onboardingId], references: [id], onDelete: Cascade)
+  documents       Document[]
+
+  @@index([onboardingId])
+}
+
+model Document {
+  id              String   @id @default(cuid())
+  
+  fileName        String
+  originalName    String
+  mimeType        String
+  fileSize        Int
+  filePath        String
+  
+  category        String   // KYC, PAYMENT, EOI, QUOTATION, PO, CONTRACT, OTHER
+  
+  buyerId         String?
+  checklistItemId String?
+  
+  status          String   @default("UPLOADED") // UPLOADED, UNDER_REVIEW, VERIFIED, REJECTED, EXPIRED
+  
+  uploadedById    String?
+  uploadedAt      DateTime @default(now())
+  expiryDate      DateTime?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  buyer           BuyerAccount?        @relation(fields: [buyerId], references: [id])
+  checklistItem   OnboardingChecklist? @relation(fields: [checklistItemId], references: [id])
+  verifications   DocumentVerification[]
+
+  @@index([buyerId])
+  @@index([category])
+  @@index([status])
+  @@index([checklistItemId])
+}
+
+model DocumentVerification {
+  id              String   @id @default(cuid())
+  documentId      String
+  
+  action          String   // VERIFIED, REJECTED, RESUBMISSION_REQUIRED
+  notes           String?
+  
+  verifiedById    String
+  createdAt       DateTime @default(now())
+
+  document        Document @relation(fields: [documentId], references: [id])
+  verifiedBy      User     @relation(fields: [verifiedById], references: [id])
+
+  @@index([documentId])
+}
+
+// ==================== NOTIFICATIONS ====================
+
+model Notification {
+  id              String   @id @default(cuid())
+  userId          String
+  
+  title           String
+  message         String
+  type            String   // LEAD, FOLLOW_UP, EOI, RESERVATION, PAYMENT, DOCUMENT, ONBOARDING, SYSTEM
+  
+  entityType      String?
+  entityId        String?
+  
+  isRead          Boolean  @default(false)
+  readAt          DateTime?
+  
+  createdAt       DateTime @default(now())
+
+  user            User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt])
+}
+
+// ==================== AUDIT LOG ====================
+
+model AuditLog {
+  id              String   @id @default(cuid())
+  
+  userId          String?
+  action          String
+  entity          String
+  entityId        String?
+  
+  description     String?
+  previousValue   String?
+  newValue        String?
+  ipAddress       String?
+  
+  createdAt       DateTime @default(now())
+
+  user            User?    @relation(fields: [userId], references: [id])
+
+  @@index([entity])
+  @@index([entityId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+// ==================== SYSTEM SETTINGS ====================
+
+model SystemSetting {
+  id              String   @id @default(cuid())
+  key             String   @unique
+  value           String
+  description     String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// ==================== BROKERS & CHANNEL PARTNERS ====================
+
+model Broker {
+  id              String   @id @default(cuid())
+  brokerNumber    String   @unique
+  name            String
+  tradeLicense    String?  // RERA ORN / BRN e.g. "ORN-97"
+  contactPerson   String?
+  email           String?
+  phone           String?
+  propertySpecialization String? @default("Apartments & Luxury Villas")
+  monthlyClosed   Int      @default(4)
+  quarterlyClosed Int      @default(12)
+  yearlyClosed    Int      @default(38)
+  tier            String   @default("GOLD") // PLATINUM, GOLD, SILVER, DIRECT
+  status          String   @default("ACTIVE") // ACTIVE, INACTIVE
+  address         String?
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  leads           Lead[]
+  buyers          BuyerAccount[]
+  opportunities   Opportunity[]
+
+  @@index([status])
+  @@index([name])
+}
