@@ -27,9 +27,34 @@ import {
   Calendar,
   Layers,
   Handshake,
+  Clock,
+  Check,
+  Plus,
+  CalendarClock,
 } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
 import { formatDate, formatCurrency } from "@/lib/utils";
+
+function getNextDayOfWeek(dayOfWeek: number, hour = 10, minute = 0) {
+  // 0 = Sunday, 1 = Monday, ..., 5 = Friday, 6 = Saturday
+  const d = new Date();
+  const currentDay = d.getDay();
+  let daysToAdd = (dayOfWeek - currentDay + 7) % 7;
+  if (daysToAdd === 0) daysToAdd = 7;
+  d.setDate(d.getDate() + daysToAdd);
+  d.setHours(hour, minute, 0, 0);
+  return d;
+}
+
+function toLocalDatetimeString(date: Date) {
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  const yyyy = date.getFullYear();
+  const MM = pad(date.getMonth() + 1);
+  const dd = pad(date.getDate());
+  const hh = pad(date.getHours());
+  const mm = pad(date.getMinutes());
+  return `${yyyy}-${MM}-${dd}T${hh}:${mm}`;
+}
 
 export default function LeadDetailPage({
   params,
@@ -56,6 +81,16 @@ export default function LeadDetailPage({
   const [brokersList, setBrokersList] = useState<any[]>([]);
   const [projectsList, setProjectsList] = useState<any[]>([]);
 
+  // Tasks / Follow-ups State
+  const [followUps, setFollowUps] = useState<any[]>([]);
+  const [taskFilter, setTaskFilter] = useState<"pending" | "completed">("pending");
+  const [showNewTaskForm, setShowNewTaskForm] = useState(true);
+  const [taskTitle, setTaskTitle] = useState("");
+  const [taskDueDate, setTaskDueDate] = useState("");
+  const [taskPriority, setTaskPriority] = useState<"HIGH" | "MEDIUM" | "LOW">("MEDIUM");
+  const [taskDescription, setTaskDescription] = useState("");
+  const [submittingTask, setSubmittingTask] = useState(false);
+
   // Edit Lead State (Inline & Modal)
   const [showEditModal, setShowEditModal] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
@@ -81,6 +116,7 @@ export default function LeadDetailPage({
     brokerId: "",
     interestedProjectId: "",
     propertyType: "APARTMENT",
+    nextFollowUpDate: "",
   });
 
   const handleOpenEdit = () => {
@@ -124,6 +160,7 @@ export default function LeadDetailPage({
       brokerId: data.brokerId || data.broker?.id || "",
       interestedProjectId: data.interestedProjectId || data.project?.id || "",
       propertyType: data.propertyType || "APARTMENT",
+      nextFollowUpDate: data.nextFollowUpDate ? toLocalDatetimeString(new Date(data.nextFollowUpDate)) : "",
     });
   };
 
@@ -166,6 +203,7 @@ export default function LeadDetailPage({
           brokerId: editForm.brokerId || null,
           interestedProjectId: editForm.interestedProjectId || null,
           propertyType: editForm.propertyType || "APARTMENT",
+          nextFollowUpDate: editForm.nextFollowUpDate ? new Date(editForm.nextFollowUpDate).toISOString() : null,
         }),
       });
       const data = await res.json();
@@ -174,6 +212,7 @@ export default function LeadDetailPage({
         setIsInlineEditing(false);
         setShowEditModal(false);
         fetchLead();
+        fetchFollowUps();
       } else {
         addToast("error", data.error || "Failed to update lead");
       }
@@ -181,6 +220,99 @@ export default function LeadDetailPage({
       addToast("error", "Error saving lead");
     } finally {
       setSavingEdit(false);
+    }
+  };
+
+  const fetchFollowUps = async () => {
+    try {
+      const res = await fetch(`/api/follow-ups?leadId=${id}`);
+      const data = await res.json();
+      if (res.ok) {
+        setFollowUps(data.followUps || []);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleCreateTask = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!taskTitle.trim()) {
+      addToast("error", "Please enter a task subject / title");
+      return;
+    }
+    if (!taskDueDate) {
+      addToast("error", "Please select a follow-up date and time");
+      return;
+    }
+
+    setSubmittingTask(true);
+    try {
+      const res = await fetch("/api/follow-ups", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: taskTitle.trim(),
+          dueDate: new Date(taskDueDate).toISOString(),
+          priority: taskPriority,
+          description: taskDescription.trim() || undefined,
+          leadId: id,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        addToast("success", "Follow-up task scheduled successfully!");
+        setTaskTitle("");
+        setTaskDueDate("");
+        setTaskDescription("");
+        setTaskPriority("MEDIUM");
+        fetchFollowUps();
+        fetchLead();
+      } else {
+        addToast("error", data.error || "Failed to schedule follow-up task");
+      }
+    } catch {
+      addToast("error", "Failed to schedule follow-up task");
+    } finally {
+      setSubmittingTask(false);
+    }
+  };
+
+  const handleToggleTaskStatus = async (taskId: string, currentStatus: string) => {
+    const newStatus = currentStatus === "COMPLETED" ? "PENDING" : "COMPLETED";
+    try {
+      const res = await fetch(`/api/follow-ups/${taskId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (res.ok) {
+        addToast("success", newStatus === "COMPLETED" ? "Task marked completed! ✓" : "Task marked pending");
+        fetchFollowUps();
+        fetchLead();
+      } else {
+        addToast("error", "Failed to update task");
+      }
+    } catch {
+      addToast("error", "Error updating task");
+    }
+  };
+
+  const handleDeleteTask = async (taskId: string) => {
+    if (!confirm("Are you sure you want to delete this follow-up task?")) return;
+    try {
+      const res = await fetch(`/api/follow-ups/${taskId}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        addToast("success", "Task deleted");
+        fetchFollowUps();
+        fetchLead();
+      } else {
+        addToast("error", "Failed to delete task");
+      }
+    } catch {
+      addToast("error", "Error deleting task");
     }
   };
 
@@ -213,6 +345,9 @@ export default function LeadDetailPage({
       if (res.ok) {
         setLead(data.lead);
         populateEditForm(data.lead);
+        if (data.lead.followUps) {
+          setFollowUps(data.lead.followUps);
+        }
         // Pre-fill conversion form
         setConvertForm((prev) => ({
           ...prev,
@@ -233,6 +368,7 @@ export default function LeadDetailPage({
 
   useEffect(() => {
     fetchLead();
+    fetchFollowUps();
     // Load accounts and brokers for conversion
     fetch("/api/accounts?limit=100")
       .then((r) => r.json())
@@ -507,10 +643,12 @@ export default function LeadDetailPage({
         </button>
       </div>
 
-      {/* Tab 1: Overview — Salesforce Lightning Inline Editable Layout */}
+      {/* Tab 1: Overview — Salesforce Lightning Inline Editable Layout with Tasks Panel */}
       {activeTab === "overview" && (
-        <div className="space-y-6">
-          {/* Section 1: Lead Information */}
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+          {/* Left Column (8 cols): Lead Information & Property Details */}
+          <div className="xl:col-span-8 space-y-6">
+            {/* Section 1: Lead Information */}
           <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
             {/* Collapsible Section Header */}
             <button
@@ -727,6 +865,46 @@ export default function LeadDetailPage({
                           onClick={handleStartInlineEdit}
                           className="p-1 text-slate-300 hover:text-blue-600 group-hover:text-slate-500 rounded transition-colors"
                           title="Edit Rating"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Next Follow-up */}
+                  <div className="border-b border-slate-100 py-2 px-3 hover:bg-slate-50/70 transition-colors flex items-center justify-between group min-h-[46px]">
+                    <div className="text-xs font-medium text-slate-500 w-[38%] shrink-0 pr-2">
+                      Next Follow-up
+                    </div>
+                    {isInlineEditing ? (
+                      <input
+                        type="datetime-local"
+                        value={editForm.nextFollowUpDate}
+                        onChange={(e) => setEditForm({ ...editForm, nextFollowUpDate: e.target.value })}
+                        className="flex-1 px-2.5 py-1.5 text-xs text-slate-800 bg-white border border-slate-300 rounded focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 shadow-xs font-mono"
+                      />
+                    ) : (
+                      <div className="flex-1 flex items-center justify-between gap-2 overflow-hidden">
+                        {lead.nextFollowUpDate ? (
+                          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+                            <Calendar className="w-3.5 h-3.5 text-amber-600" />
+                            {new Date(lead.nextFollowUpDate).toLocaleString("en-US", {
+                              weekday: "short",
+                              month: "short",
+                              day: "numeric",
+                              hour: "numeric",
+                              minute: "2-digit",
+                            })}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 text-xs italic">No follow-up scheduled</span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={handleStartInlineEdit}
+                          className="p-1 text-slate-300 hover:text-blue-600 group-hover:text-slate-500 rounded transition-colors"
+                          title="Edit Follow-up Date"
                         >
                           <Pencil className="w-3.5 h-3.5" />
                         </button>
@@ -1197,6 +1375,390 @@ export default function LeadDetailPage({
                 )}
               </div>
             )}
+          </div>
+          </div>
+
+          {/* Right Column (4 cols): Tasks & Follow-up Panel */}
+          <div className="xl:col-span-4 space-y-4">
+            {/* Active Follow-up Banner if upcoming */}
+            {lead.nextFollowUpDate && (
+              <div className="p-3.5 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 shadow-2xs flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                    <Calendar className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-blue-700 block">
+                      Next Follow-up Due
+                    </span>
+                    <span className="text-xs font-bold text-slate-900 block">
+                      {new Date(lead.nextFollowUpDate).toLocaleString("en-US", {
+                        weekday: "short",
+                        month: "short",
+                        day: "numeric",
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                  </div>
+                </div>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 font-semibold border border-blue-200">
+                  Active
+                </span>
+              </div>
+            )}
+
+            {/* Main Tasks & Follow-up Card */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+              {/* Header */}
+              <div className="p-3.5 bg-slate-50/80 border-b border-slate-200 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center">
+                    <Clock className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                      Tasks & Follow-up
+                    </h3>
+                    <p className="text-[10px] text-slate-400">
+                      {followUps.filter((f) => f.status === "PENDING").length} pending follow-up tasks
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowNewTaskForm(!showNewTaskForm)}
+                  className="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1 transition-colors shadow-2xs"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  {showNewTaskForm ? "Close" : "New Task"}
+                </button>
+              </div>
+
+              {/* Schedule Task Form */}
+              {showNewTaskForm && (
+                <form onSubmit={handleCreateTask} className="p-4 border-b border-slate-200 bg-slate-50/50 space-y-3 text-xs">
+                  {/* Quick Action Chips */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1.5">
+                      Quick Action Presets
+                    </label>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setTaskTitle("Call client to discuss property requirements")}
+                        className="px-2 py-1 rounded-md bg-white border border-slate-200 hover:border-blue-500 hover:text-blue-600 text-[11px] font-medium text-slate-700 transition-colors flex items-center gap-1 text-left shadow-2xs"
+                      >
+                        <Phone className="w-3 h-3 text-emerald-600 shrink-0" /> Call Client
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTaskTitle("WhatsApp client project brochures and pricing")}
+                        className="px-2 py-1 rounded-md bg-white border border-slate-200 hover:border-blue-500 hover:text-blue-600 text-[11px] font-medium text-slate-700 transition-colors flex items-center gap-1 text-left shadow-2xs"
+                      >
+                        <MessageSquare className="w-3 h-3 text-emerald-600 shrink-0" /> WhatsApp
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTaskTitle("Send formal quotation and floor plans via email")}
+                        className="px-2 py-1 rounded-md bg-white border border-slate-200 hover:border-blue-500 hover:text-blue-600 text-[11px] font-medium text-slate-700 transition-colors flex items-center gap-1 text-left shadow-2xs"
+                      >
+                        <Mail className="w-3 h-3 text-blue-600 shrink-0" /> Email Proposal
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTaskTitle("Schedule in-person unit showing and site tour")}
+                        className="px-2 py-1 rounded-md bg-white border border-slate-200 hover:border-blue-500 hover:text-blue-600 text-[11px] font-medium text-slate-700 transition-colors flex items-center gap-1 text-left shadow-2xs"
+                      >
+                        <Building2 className="w-3 h-3 text-purple-600 shrink-0" /> Site Visit
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Task Title */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      Task Subject / Follow-up Action *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Call client next Friday..."
+                      value={taskTitle}
+                      onChange={(e) => setTaskTitle(e.target.value)}
+                      className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 shadow-2xs"
+                    />
+                  </div>
+
+                  {/* Quick Date Presets & Date Input */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[11px] font-bold text-slate-700">
+                        Follow-up Date & Time *
+                      </label>
+                      <span className="text-[10px] text-slate-400">Quick Picks:</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-1 mb-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const d = new Date();
+                          d.setHours(16, 0, 0, 0);
+                          setTaskDueDate(toLocalDatetimeString(d));
+                        }}
+                        className="px-1.5 py-1 rounded bg-white border border-slate-200 hover:bg-blue-50 hover:text-blue-600 text-[10px] text-slate-600 transition-colors"
+                      >
+                        Today 4:00 PM
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const d = new Date();
+                          d.setDate(d.getDate() + 1);
+                          d.setHours(10, 0, 0, 0);
+                          setTaskDueDate(toLocalDatetimeString(d));
+                        }}
+                        className="px-1.5 py-1 rounded bg-white border border-slate-200 hover:bg-blue-50 hover:text-blue-600 text-[10px] text-slate-600 transition-colors"
+                      >
+                        Tomorrow 10 AM
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const d = getNextDayOfWeek(5, 10, 0);
+                          setTaskDueDate(toLocalDatetimeString(d));
+                        }}
+                        className="px-1.5 py-1 rounded bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 text-[10px] font-semibold transition-colors"
+                      >
+                        Next Friday 10 AM
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const d = getNextDayOfWeek(1, 10, 0);
+                          setTaskDueDate(toLocalDatetimeString(d));
+                        }}
+                        className="px-1.5 py-1 rounded bg-white border border-slate-200 hover:bg-blue-50 hover:text-blue-600 text-[10px] text-slate-600 transition-colors"
+                      >
+                        Next Monday 10 AM
+                      </button>
+                    </div>
+                    <input
+                      type="datetime-local"
+                      required
+                      value={taskDueDate}
+                      onChange={(e) => setTaskDueDate(e.target.value)}
+                      className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 shadow-2xs font-mono"
+                    />
+                  </div>
+
+                  {/* Priority and Owner */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                        Priority
+                      </label>
+                      <select
+                        value={taskPriority}
+                        onChange={(e) => setTaskPriority(e.target.value as any)}
+                        className="w-full px-2 py-1.5 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-blue-600 font-medium"
+                      >
+                        <option value="HIGH">🔴 High Priority</option>
+                        <option value="MEDIUM">🟡 Medium Priority</option>
+                        <option value="LOW">⚪ Low Priority</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                        Assigned Owner
+                      </label>
+                      <div className="px-2.5 py-1.5 text-xs bg-slate-100 border border-slate-200 rounded-lg text-slate-600 truncate flex items-center gap-1 font-medium">
+                        <Users className="w-3 h-3 text-slate-400 shrink-0" />
+                        {lead.assignedAdvisor ? `${lead.assignedAdvisor.firstName} ${lead.assignedAdvisor.lastName}` : "Lead Owner"}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Notes / Remarks */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      Client Remarks / Follow-up Notes
+                    </label>
+                    <textarea
+                      rows={2}
+                      placeholder="e.g. Client requested call on Friday regarding apartment price..."
+                      value={taskDescription}
+                      onChange={(e) => setTaskDescription(e.target.value)}
+                      className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-blue-600 shadow-2xs"
+                    />
+                  </div>
+
+                  {/* Submit */}
+                  <div className="pt-1 flex items-center justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTaskTitle("");
+                        setTaskDueDate("");
+                        setTaskDescription("");
+                        setShowNewTaskForm(false);
+                      }}
+                      className="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={submittingTask || !taskTitle.trim() || !taskDueDate}
+                      className="px-3.5 py-1.5 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors shadow-xs disabled:opacity-50 flex items-center gap-1.5"
+                    >
+                      {submittingTask ? (
+                        "Scheduling..."
+                      ) : (
+                        <>
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          Add Follow-up Task
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* Tasks Filter Pills */}
+              <div className="p-3 bg-white border-b border-slate-100 flex items-center justify-between">
+                <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg text-[11px] font-semibold">
+                  <button
+                    type="button"
+                    onClick={() => setTaskFilter("pending")}
+                    className={`px-2.5 py-1 rounded-md transition-colors ${
+                      taskFilter === "pending"
+                        ? "bg-white text-blue-700 shadow-2xs"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    Pending ({followUps.filter((f) => f.status === "PENDING").length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTaskFilter("completed")}
+                    className={`px-2.5 py-1 rounded-md transition-colors ${
+                      taskFilter === "completed"
+                        ? "bg-white text-blue-700 shadow-2xs"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    Completed ({followUps.filter((f) => f.status === "COMPLETED").length})
+                  </button>
+                </div>
+              </div>
+
+              {/* Task Cards List */}
+              <div className="divide-y divide-slate-100 max-h-[460px] overflow-y-auto">
+                {followUps
+                  .filter((f) => (taskFilter === "pending" ? f.status === "PENDING" : f.status === "COMPLETED"))
+                  .length === 0 ? (
+                  <div className="p-8 text-center text-slate-400 text-xs">
+                    <Clock className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                    <p className="font-semibold text-slate-700">No {taskFilter} tasks</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      {taskFilter === "pending"
+                        ? "All follow-up tasks are up to date."
+                        : "No completed follow-up tasks yet."}
+                    </p>
+                  </div>
+                ) : (
+                  followUps
+                    .filter((f) => (taskFilter === "pending" ? f.status === "PENDING" : f.status === "COMPLETED"))
+                    .map((task: any) => {
+                      const isOverdue = task.status === "PENDING" && new Date(task.dueDate) < new Date();
+                      const isDone = task.status === "COMPLETED";
+                      return (
+                        <div
+                          key={task.id}
+                          className={`p-3.5 transition-colors hover:bg-slate-50/80 flex items-start gap-2.5 group ${
+                            isOverdue ? "bg-red-50/30" : ""
+                          }`}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => handleToggleTaskStatus(task.id, task.status)}
+                            className={`mt-0.5 w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${
+                              isDone
+                                ? "bg-emerald-600 border-emerald-600 text-white"
+                                : "border-slate-300 hover:border-blue-600 bg-white"
+                            }`}
+                            title={isDone ? "Mark as pending" : "Mark as completed"}
+                          >
+                            {isDone && <Check className="w-3 h-3 stroke-[3]" />}
+                          </button>
+
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span
+                                className={`text-xs font-semibold ${
+                                  isDone ? "line-through text-slate-400" : "text-slate-900"
+                                }`}
+                              >
+                                {task.title}
+                              </span>
+                              {isOverdue && (
+                                <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-red-100 text-red-700 border border-red-200">
+                                  OVERDUE
+                                </span>
+                              )}
+                              <span
+                                className={`px-1.5 py-0.2 rounded text-[10px] font-semibold border ${
+                                  task.priority === "HIGH"
+                                    ? "bg-red-50 text-red-700 border-red-200"
+                                    : task.priority === "MEDIUM"
+                                    ? "bg-amber-50 text-amber-700 border-amber-200"
+                                    : "bg-slate-50 text-slate-600 border-slate-200"
+                                }`}
+                              >
+                                {task.priority}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-2 mt-1 text-[11px] text-slate-500">
+                              <span className="flex items-center gap-1 font-medium">
+                                <Calendar className="w-3 h-3 text-slate-400 shrink-0" />
+                                {new Date(task.dueDate).toLocaleString("en-US", {
+                                  weekday: "short",
+                                  month: "short",
+                                  day: "numeric",
+                                  hour: "numeric",
+                                  minute: "2-digit",
+                                })}
+                              </span>
+                              {task.assignedTo && (
+                                <span className="text-slate-400 truncate">
+                                  • {task.assignedTo.firstName} {task.assignedTo.lastName}
+                                </span>
+                              )}
+                            </div>
+
+                            {task.description && (
+                              <p className="mt-1.5 text-[11px] text-slate-600 bg-slate-50 p-2 rounded-lg border border-slate-100 whitespace-pre-line">
+                                {task.description}
+                              </p>
+                            )}
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteTask(task.id)}
+                            className="p-1 text-slate-300 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                            title="Delete Task"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      );
+                    })
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}
