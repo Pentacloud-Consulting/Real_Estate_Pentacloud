@@ -5,7 +5,6 @@ import { useRouter, usePathname } from "next/navigation";
 import {
   Search,
   Bell,
-  Plus,
   ChevronDown,
   LogOut,
   User,
@@ -109,14 +108,6 @@ export function TopBar({ onMenuClick, sidebarCollapsed }: TopBarProps) {
             />
           </div>
         </form>
-
-        <button
-          onClick={() => router.push("/leads")}
-          className="hidden sm:flex items-center gap-1.5 bg-[#153B66] hover:bg-[#102C4C] text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow-xs transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          <span>New Lead</span>
-        </button>
 
         <button
           onClick={() => router.push("/activities")}
