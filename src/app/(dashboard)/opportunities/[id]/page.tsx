@@ -37,9 +37,45 @@ import {
   Eye,
   FileCheck,
   Building,
+  Copy,
+  ExternalLink,
+  Upload,
 } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
 import { formatDate, formatCurrency } from "@/lib/utils";
+
+const KYC_SLOTS = [
+  {
+    id: "passport",
+    title: "Passport Copy / National ID",
+    desc: "Primary legal identity verification (valid minimum 6 months)",
+    required: true,
+  },
+  {
+    id: "residence_visa",
+    title: "Emirates ID / Residence Visa / Permit",
+    desc: "Proof of UAE / international residency status",
+    required: true,
+  },
+  {
+    id: "proof_of_address",
+    title: "Proof of Residential Address",
+    desc: "Recent utility bill (DEWA / SEWA) or Ejari tenancy contract within 3 months",
+    required: true,
+  },
+  {
+    id: "bank_statement",
+    title: "Source of Funds / Bank Statement",
+    desc: "Bank statement (last 3-6 months) verifying transaction funds",
+    required: true,
+  },
+  {
+    id: "kyc_declaration",
+    title: "Signed KYC Declaration & CDD",
+    desc: "Anti-Money Laundering & Buyer Due Diligence declaration",
+    required: false,
+  },
+];
 
 const PIPELINE_STAGES = [
   { key: "PROSPECTING", label: "Prospecting" },
@@ -61,7 +97,66 @@ export default function OpportunityDetailPage({
 
   const [opp, setOpp] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"overview" | "transactions" | "activities" | "history">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "transactions" | "kyc" | "activities" | "history">("overview");
+
+  // KYC Document Handlers
+  const [uploadingDocType, setUploadingDocType] = useState<string | null>(null);
+
+  const handleVerifyKycDoc = async (docId: string, status: "VERIFIED" | "REJECTED") => {
+    try {
+      const res = await fetch(`/api/kyc/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ documentId: docId, status }),
+      });
+      if (res.ok) {
+        addToast("success", status === "VERIFIED" ? "Document marked as VERIFIED ✓" : "Document marked as REJECTED");
+        fetchOpportunity();
+      } else {
+        addToast("error", "Failed to update document status");
+      }
+    } catch {
+      addToast("error", "Error updating document");
+    }
+  };
+
+  const handleInternalKycUpload = async (docType: string, file: File) => {
+    if (!file) return;
+    if (file.size > 25 * 1024 * 1024) {
+      addToast("error", "File size exceeds 25 MB limit");
+      return;
+    }
+    setUploadingDocType(docType);
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64Data = reader.result as string;
+        const res = await fetch(`/api/kyc/${id}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            docType,
+            fileName: file.name,
+            fileData: base64Data,
+            fileSize: file.size,
+            mimeType: file.type || "application/octet-stream",
+          }),
+        });
+        const d = await res.json();
+        if (res.ok) {
+          addToast("success", "KYC document uploaded successfully!");
+          fetchOpportunity();
+        } else {
+          addToast("error", d.error || "Failed to upload document");
+        }
+        setUploadingDocType(null);
+      };
+      reader.readAsDataURL(file);
+    } catch {
+      addToast("error", "Error uploading document");
+      setUploadingDocType(null);
+    }
+  };
 
   // Auxiliary dropdown lists
   const [accounts, setAccounts] = useState<any[]>([]);
@@ -804,6 +899,29 @@ export default function OpportunityDetailPage({
               </span>
             )}
 
+            {/* Copy Client KYC Portal Link */}
+            <button
+              onClick={() => {
+                const url = `${window.location.origin}/kyc/${opp.id}`;
+                navigator.clipboard.writeText(url);
+                addToast("success", "Client KYC Document Portal link copied to clipboard!");
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 border border-blue-200 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-semibold transition-colors"
+              title="Copy Client KYC Document Upload Link"
+            >
+              <FileText className="w-3.5 h-3.5 text-blue-600" />
+              Copy Client KYC Link
+            </button>
+            <a
+              href={`/kyc/${opp.id}`}
+              target="_blank"
+              rel="noreferrer"
+              className="p-1.5 border border-slate-200 hover:bg-slate-50 text-slate-500 hover:text-blue-600 rounded-lg transition-colors"
+              title="Open Client Document Portal in new tab"
+            >
+              <ExternalLink className="w-4 h-4" />
+            </a>
+
             <button
               onClick={() => {
                 if (isInlineEditing) {
@@ -885,6 +1003,19 @@ export default function OpportunityDetailPage({
           Quotations, EOI & PO
           <span className="px-1.5 py-0.2 rounded-full text-xs bg-slate-100 text-slate-600 font-normal">
             {(opp.quotations?.length || 0) + (opp.eois?.length || 0) + (opp.purchaseOrders?.length || 0)}
+          </span>
+        </button>
+        <button
+          onClick={() => setActiveTab("kyc")}
+          className={`pb-3 text-sm font-semibold transition-colors flex items-center gap-1.5 ${
+            activeTab === "kyc"
+              ? "text-blue-600 border-b-2 border-blue-600"
+              : "text-slate-500 hover:text-slate-800"
+          }`}
+        >
+          KYC Documents
+          <span className="px-1.5 py-0.2 rounded-full text-xs bg-blue-100 text-blue-700 font-bold">
+            {opp.documents?.filter((d: any) => d.category === "KYC")?.length || 0}/5
           </span>
         </button>
         <button
@@ -2115,6 +2246,235 @@ export default function OpportunityDetailPage({
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Tab 2.5: KYC Documents Portal & Verification */}
+      {activeTab === "kyc" && (
+        <div className="space-y-6">
+          {/* Client KYC Portal Share Banner */}
+          <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-slate-50 rounded-2xl border border-blue-200 p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold">
+                  <ShieldCheck className="w-4 h-4" />
+                </div>
+                <h3 className="font-bold text-slate-900 text-sm">
+                  Client Document Collection Portal Link
+                </h3>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                  Public Portal Active
+                </span>
+              </div>
+              <p className="text-xs text-slate-600 max-w-2xl">
+                Send this link directly to the client via WhatsApp, Email or SMS. The client can open it on mobile or desktop to upload their KYC documents (Passport, Visa, Proof of Address, Bank Statement). All uploaded files will appear below automatically.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  const url = `${window.location.origin}/kyc/${opp.id}`;
+                  navigator.clipboard.writeText(url);
+                  addToast("success", "Client KYC link copied to clipboard!");
+                }}
+                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5"
+              >
+                <Copy className="w-3.5 h-3.5" />
+                Copy Link for Client
+              </button>
+              <a
+                href={`/kyc/${opp.id}`}
+                target="_blank"
+                rel="noreferrer"
+                className="px-3.5 py-2 rounded-xl bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-colors flex items-center gap-1.5"
+              >
+                <ExternalLink className="w-3.5 h-3.5 text-blue-600" />
+                Open Portal
+              </a>
+            </div>
+          </div>
+
+          {/* KYC Checklist Status Summary */}
+          <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+              <div>
+                <h4 className="font-bold text-slate-900 text-sm">
+                  KYC Verification & Document Vault (5 Items)
+                </h4>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Review submitted client documents or upload on their behalf.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-slate-600">
+                  Compliance Progress:
+                </span>
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                  {opp.documents?.filter((d: any) => d.category === "KYC").length || 0} / 5 Collected
+                </span>
+              </div>
+            </div>
+
+            {/* Document Slots */}
+            <div className="space-y-3.5 pt-1">
+              {KYC_SLOTS.map((slot, index) => {
+                const uploadedDoc = opp.documents?.find(
+                  (d: any) => d.category === "KYC" && (d.docType === slot.id || d.fileName?.includes(slot.id))
+                );
+                const isUploaded = Boolean(uploadedDoc);
+
+                return (
+                  <div
+                    key={slot.id}
+                    className={`rounded-xl border p-4 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4 ${
+                      isUploaded
+                        ? uploadedDoc.status === "VERIFIED"
+                          ? "bg-emerald-50/20 border-emerald-200 shadow-2xs"
+                          : "bg-blue-50/20 border-blue-200 shadow-2xs"
+                        : "bg-white border-slate-200 hover:border-slate-300"
+                    }`}
+                  >
+                    <div className="flex items-start gap-3.5 min-w-0">
+                      <div
+                        className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${
+                          isUploaded
+                            ? uploadedDoc.status === "VERIFIED"
+                              ? "bg-emerald-100 text-emerald-700 border-emerald-300"
+                              : "bg-blue-100 text-blue-700 border-blue-300"
+                            : "bg-slate-100 text-slate-500 border-slate-200"
+                        }`}
+                      >
+                        {isUploaded ? (
+                          uploadedDoc.status === "VERIFIED" ? (
+                            <ShieldCheck className="w-5 h-5 text-emerald-700" />
+                          ) : (
+                            <FileCheck className="w-5 h-5 text-blue-700" />
+                          )
+                        ) : (
+                          <span className="font-bold text-xs">{index + 1}</span>
+                        )}
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h5 className="font-bold text-slate-900 text-xs sm:text-sm">
+                            {slot.title}
+                          </h5>
+                          {slot.required ? (
+                            <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                              Mandatory
+                            </span>
+                          ) : (
+                            <span className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-slate-100 text-slate-500">
+                              Optional
+                            </span>
+                          )}
+
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                              isUploaded
+                                ? uploadedDoc.status === "VERIFIED"
+                                  ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+                                  : "bg-blue-100 text-blue-800 border-blue-300"
+                                : "bg-slate-100 text-slate-600 border-slate-200"
+                            }`}
+                          >
+                            {isUploaded
+                              ? uploadedDoc.status === "VERIFIED"
+                                ? "Verified ✓"
+                                : "Uploaded (Pending Review)"
+                              : "Pending Client Upload"}
+                          </span>
+                        </div>
+
+                        <p className="text-xs text-slate-500 mt-1">{slot.desc}</p>
+
+                        {isUploaded && (
+                          <div className="mt-2 text-[11px] text-slate-700 flex items-center gap-3 bg-white/80 p-2 rounded-lg border border-slate-200">
+                            <span className="font-semibold truncate max-w-[260px]">
+                              📎 {uploadedDoc.originalName}
+                            </span>
+                            <span className="text-slate-400">
+                              ({Math.round((uploadedDoc.fileSize || 0) / 1024)} KB)
+                            </span>
+                            <span className="text-slate-400">
+                              • {formatDate(uploadedDoc.createdAt)}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="shrink-0 flex items-center gap-2 flex-wrap">
+                      {isUploaded && uploadedDoc.filePath && (
+                        <a
+                          href={uploadedDoc.filePath}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs transition-colors flex items-center gap-1 shadow-2xs"
+                        >
+                          <Eye className="w-3.5 h-3.5 text-blue-600" />
+                          View Document
+                        </a>
+                      )}
+
+                      {isUploaded && uploadedDoc.status !== "VERIFIED" && (
+                        <button
+                          type="button"
+                          onClick={() => handleVerifyKycDoc(uploadedDoc.id, "VERIFIED")}
+                          className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs transition-colors flex items-center gap-1 shadow-2xs"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          Verify
+                        </button>
+                      )}
+
+                      {isUploaded && uploadedDoc.status === "VERIFIED" && (
+                        <button
+                          type="button"
+                          onClick={() => handleVerifyKycDoc(uploadedDoc.id, "REJECTED")}
+                          className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 hover:bg-red-50 text-slate-500 hover:text-red-600 font-semibold text-xs transition-colors"
+                        >
+                          Reject
+                        </button>
+                      )}
+
+                      {/* Upload on behalf of client button */}
+                      <label className="cursor-pointer">
+                        <input
+                          type="file"
+                          accept=".pdf,.jpg,.jpeg,.png"
+                          disabled={uploadingDocType === slot.id}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleInternalKycUpload(slot.id, file);
+                          }}
+                          className="hidden"
+                        />
+                        <span
+                          className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors shadow-2xs ${
+                            isUploaded
+                              ? "bg-white border border-slate-200 hover:bg-slate-50 text-slate-600"
+                              : "bg-blue-600 hover:bg-blue-700 text-white"
+                          }`}
+                        >
+                          <Upload className="w-3.5 h-3.5" />
+                          {uploadingDocType === slot.id
+                            ? "Uploading..."
+                            : isUploaded
+                            ? "Replace"
+                            : "Upload File"}
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}

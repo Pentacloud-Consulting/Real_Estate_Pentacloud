@@ -421,6 +421,7 @@ model Opportunity {
   purchaseOrders      PurchaseOrder[]
   activities          Activity[]
   followUps           FollowUp[]
+  documents           Document[]
 
   @@index([stage])
   @@index([buyerId])
@@ -825,8 +826,10 @@ model Document {
   filePath        String
   
   category        String   // KYC, PAYMENT, EOI, QUOTATION, PO, CONTRACT, OTHER
+  docType         String?  // passport, residence_visa, proof_of_address, bank_statement, kyc_declaration
   
   buyerId         String?
+  opportunityId   String?
   checklistItemId String?
   
   status          String   @default("UPLOADED") // UPLOADED, UNDER_REVIEW, VERIFIED, REJECTED, EXPIRED
@@ -840,10 +843,12 @@ model Document {
 
   // Relations
   buyer           BuyerAccount?        @relation(fields: [buyerId], references: [id])
+  opportunity     Opportunity?         @relation(fields: [opportunityId], references: [id])
   checklistItem   OnboardingChecklist? @relation(fields: [checklistItemId], references: [id])
   verifications   DocumentVerification[]
 
   @@index([buyerId])
+  @@index([opportunityId])
   @@index([category])
   @@index([status])
   @@index([checklistItemId])

@@ -41,6 +41,9 @@ export async function GET(
         purchaseOrders: {
           orderBy: { createdAt: "desc" },
         },
+        documents: {
+          orderBy: { createdAt: "desc" },
+        },
         activities: {
           orderBy: { createdAt: "desc" },
           include: {
