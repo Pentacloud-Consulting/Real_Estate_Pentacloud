@@ -118,8 +118,8 @@ export default function LeadsPage() {
   const handleDownloadTemplate = () => {
     const csvContent =
       "First Name,Last Name,Company,Email,Mobile Phone,WhatsApp,Source,Rating,Status,Estimated Budget,Project Development,Allocated Unit,Qualification Notes\n" +
-      'Mohamed,Waseem,Al Futtaim Group,m.waseem@alfuttaim.example.ae,+971509990092,+971509990092,WEBSITE,HOT,QUALIFIED,12500000,Downtown Heights Tower,Unit #DHT-PH-01,VIP buyer looking for premium high floor penthouse\n' +
-      'Elena,Rostova,Nordic Holdings,elena.rostova@nordic.example.com,+971552345678,+971552345678,CAMPAIGN,WARM,NEW,2800000,Azure Marina Residences,,Investor seeking high rental yield 2-bedroom';
+      'Mohamed,Waseem,Al Futtaim Group,m.waseem@alfuttaim.example.ae,+971509990092,+971509990092,WEBSITE,HOT,QUALIFIED,12500000,Downtown Crown Residences,Unit #DCR-PH-01,VIP buyer looking for premium high floor penthouse\n' +
+      'Elena,Rostova,Nordic Holdings,elena.rostova@nordic.example.com,+971552345678,+971552345678,CAMPAIGN,WARM,NEW,2800000,Palm Island Beachfront Villas,,Investor seeking high rental yield villa';
 
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);

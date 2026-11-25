@@ -96,7 +96,7 @@ const initialListingForm: ListingForm = {
   reference: "",
   listingType: "OFF_PLAN",
   propertyType: "APARTMENT",
-  projectName: "Downtown Heights Tower",
+  projectName: "Downtown Crown Residences",
   unitNumber: "",
   location: "Downtown Dubai",
   city: "Dubai",
@@ -112,7 +112,7 @@ const initialListingForm: ListingForm = {
     dubizzle: true,
     website: true,
   },
-  heroImage: "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=1200&q=80",
+  heroImage: "/images/projects/downtown-crown.jpg",
   features: "Balcony, Concierge, High ROI, Private Parking",
   description: "Bespoke residential property in prime Dubai community.",
 };

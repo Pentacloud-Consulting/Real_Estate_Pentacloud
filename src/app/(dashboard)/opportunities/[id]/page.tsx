@@ -1541,7 +1541,7 @@ export default function OpportunityDetailPage({
                     ) : (
                       <div className="flex-1 flex items-center justify-between gap-2 overflow-hidden">
                         <span className="font-semibold text-slate-800 text-xs truncate">
-                          {opp.project?.name ? `${opp.project.name} (${opp.project.code})` : "Azure Marina Residences (AMR)"}
+                          {opp.project?.name ? `${opp.project.name} (${opp.project.code})` : "Downtown Crown Residences (DCR)"}
                         </span>
                         <button
                           type="button"
@@ -2689,7 +2689,7 @@ export default function OpportunityDetailPage({
                   <p className="font-bold text-slate-900 text-sm mt-0.5">
                     Unit #{opp.unit?.unitNumber || "MTE-0101"} ({opp.propertyType || "Apartment"})
                   </p>
-                  <p className="text-slate-500 text-[11px]">Development: {opp.project?.name || "Azure Marina Residences"}</p>
+                  <p className="text-slate-500 text-[11px]">Development: {opp.project?.name || "Downtown Crown Residences"}</p>
                   <p className="text-slate-600 text-[11px]">Payment Plan: {pdfPreview.data?.paymentPlan || opp.paymentPlan || "20/80"}</p>
                 </div>
               </div>

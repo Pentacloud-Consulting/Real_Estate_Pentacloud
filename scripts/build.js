@@ -1,4 +1,6 @@
 const { execSync } = require("child_process");
+const fs = require("fs");
+const path = require("path");
 
 // 1. Resolve PostgreSQL connection URL from Vercel integration variables
 const dbUrl =
@@ -12,7 +14,19 @@ if (dbUrl) {
   process.env.DATABASE_URL = dbUrl;
 }
 
-console.log("[build] Database URL resolved:", dbUrl ? "PostgreSQL URL configured" : "No database URL found");
+console.log("[build] Database URL resolved:", dbUrl ? (dbUrl.startsWith("file:") ? "SQLite database configured" : "PostgreSQL URL configured") : "No database URL found");
+
+// Adjust schema.prisma datasource provider based on connection target
+const schemaPath = path.join(__dirname, "..", "prisma", "schema.prisma");
+if (fs.existsSync(schemaPath)) {
+  let schema = fs.readFileSync(schemaPath, "utf8");
+  if (dbUrl && !dbUrl.startsWith("file:")) {
+    schema = schema.replace(/provider\s*=\s*"sqlite"/, 'provider = "postgresql"');
+  } else {
+    schema = schema.replace(/provider\s*=\s*"postgresql"/, 'provider = "sqlite"');
+  }
+  fs.writeFileSync(schemaPath, schema);
+}
 
 // 2. Generate Prisma Client
 console.log("[build] Generating Prisma Client...");

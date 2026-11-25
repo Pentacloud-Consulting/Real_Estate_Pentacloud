@@ -137,191 +137,240 @@ async function main() {
     },
   });
 
-  // 2. Projects
-  console.log("Creating projects...");
+  // 2. Projects & Images
+  console.log("Creating projects with generated high-res images...");
+  const DOWNTOWN_IMAGE = "/images/projects/downtown-crown.jpg";
+  const PALM_IMAGE = "/images/projects/palm-villas.jpg";
+  const DOWNTOWN_FALLBACK = "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1200&q=80";
+  const PALM_FALLBACK = "https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=1200&q=80";
+
   const p1 = await prisma.project.create({
     data: {
-      name: "Azure Marina Residences",
-      code: "AMR",
+      name: "Downtown Crown Residences",
+      code: "DCR",
       developer: "Pentacloud Properties",
-      description: "Ultra-luxury waterfront high-rise development in Dubai Marina featuring panoramic yacht club views, infinity pools, and smart-home integration.",
-      location: "Dubai Marina",
-      address: "Plot 392-1200, Marina Promenade",
+      description: "Iconic ultra-luxury skyscraper situated in the heart of Downtown Dubai directly overlooking Burj Khalifa and Dubai Fountain.",
+      location: "Downtown Dubai",
+      address: "Sheikh Mohammed bin Rashid Blvd",
       city: "Dubai",
-      country: "United Arab Emirates",
+      country: "UAE",
       status: "ACTIVE",
-      totalUnits: 120,
+      totalUnits: 5,
       propertyType: "APARTMENT",
-      priceRangeMin: 1200000,
-      priceRangeMax: 6500000,
-      amenities: JSON.stringify(["Marina Yacht Club Access", "Skyline Infinity Pool", "Valet Parking", "Wellness Spa & Gym", "Private Cinema", "Concierge Service"]),
+      priceRangeMin: 1850000,
+      priceRangeMax: 9800000,
+      amenities: JSON.stringify(["Burj Khalifa Views", "Infinity Pool", "Private Helipad", "Valet Parking", "Michelin Dining"]),
+      imageUrl: JSON.stringify({
+        images: [DOWNTOWN_IMAGE, DOWNTOWN_FALLBACK],
+        videoUrl: "https://www.youtube.com/watch?v=ScMzIvxBSi4",
+      }),
+      buildings: {
+        create: {
+          name: "Crown Tower",
+          totalFloors: 45,
+          totalUnits: 5,
+        },
+      },
     },
+    include: { buildings: true },
   });
 
   const p2 = await prisma.project.create({
     data: {
-      name: "Palm Vista Mansions",
-      code: "PVM",
+      name: "Palm Island Beachfront Villas",
+      code: "PIV",
       developer: "Pentacloud Properties",
-      description: "Exclusive gated beachfront villa community on Palm Jumeirah with private beaches, rooftop terraces, and personalized security.",
+      description: "Exclusive private gated beachfront community on Palm Jumeirah with private sandy beaches, rooftop lounges, and private yacht moorage.",
       location: "Palm Jumeirah",
       address: "Frond J, Palm Jumeirah",
       city: "Dubai",
-      country: "United Arab Emirates",
+      country: "UAE",
       status: "ACTIVE",
-      totalUnits: 40,
+      totalUnits: 5,
       propertyType: "VILLA",
-      priceRangeMin: 12000000,
-      priceRangeMax: 45000000,
-      amenities: JSON.stringify(["Private Beachfront", "Private Lap Pool", "Driver & Maid Quarters", "Smart Security", "Private Jetty"]),
+      priceRangeMin: 16500000,
+      priceRangeMax: 34000000,
+      amenities: JSON.stringify(["Private Beachfront", "Private Lap Pool", "Staff Quarters", "Smart Home Automation", "Private Yacht Jetty"]),
+      imageUrl: JSON.stringify({
+        images: [PALM_IMAGE, PALM_FALLBACK],
+        videoUrl: "https://www.youtube.com/watch?v=ScMzIvxBSi4",
+      }),
+      buildings: {
+        create: {
+          name: "Beachfront Frond J",
+          totalFloors: 3,
+          totalUnits: 5,
+        },
+      },
     },
+    include: { buildings: true },
   });
 
-  const p3 = await prisma.project.create({
-    data: {
-      name: "Downtown Heights Tower",
-      code: "DHT",
-      developer: "Pentacloud Properties",
-      description: "Signature skyscraper situated directly facing Burj Khalifa with bespoke penthouses and executive suites.",
-      location: "Downtown Dubai",
-      address: "Sheikh Mohammed bin Rashid Blvd",
-      city: "Dubai",
-      country: "United Arab Emirates",
-      status: "PRE_LAUNCH",
-      totalUnits: 90,
-      propertyType: "PENTHOUSE",
-      priceRangeMin: 3500000,
-      priceRangeMax: 22000000,
-      amenities: JSON.stringify(["Direct Mall Access", "Burj Khalifa Views", "Michelin Dining", "Helipad", "Executive Lounge"]),
+  // 3. Units / Inventory (5 units each, keeping same image)
+  console.log("Creating 5 units for each project with matching project images...");
+  const p1Units = [
+    {
+      unitNumber: "DCR-0101",
+      floor: 1,
+      unitType: "APARTMENT",
+      bedrooms: 1,
+      bathrooms: 2,
+      area: 950,
+      view: "Boulevard & Fountain View",
+      basePrice: 1750000,
+      finalPrice: 1850000,
     },
-  });
-
-  // 3. Buildings
-  console.log("Creating buildings...");
-  const b1 = await prisma.building.create({
-    data: {
-      name: "Marina Tower East",
-      projectId: p1.id,
-      totalFloors: 30,
-      totalUnits: 60,
+    {
+      unitNumber: "DCR-0102",
+      floor: 1,
+      unitType: "APARTMENT",
+      bedrooms: 2,
+      bathrooms: 3,
+      area: 1450,
+      view: "Burj Khalifa Full Panorama",
+      basePrice: 2600000,
+      finalPrice: 2750000,
     },
-  });
-
-  await prisma.building.create({
-    data: {
-      name: "Marina Tower West",
-      projectId: p1.id,
-      totalFloors: 30,
-      totalUnits: 60,
+    {
+      unitNumber: "DCR-0201",
+      floor: 2,
+      unitType: "APARTMENT",
+      bedrooms: 2,
+      bathrooms: 3,
+      area: 1520,
+      view: "Dubai Opera & Skyline View",
+      basePrice: 2720000,
+      finalPrice: 2890000,
     },
-  });
-
-  const b3 = await prisma.building.create({
-    data: {
-      name: "The Grand Tower",
-      projectId: p3.id,
-      totalFloors: 50,
-      totalUnits: 90,
+    {
+      unitNumber: "DCR-0202",
+      floor: 2,
+      unitType: "APARTMENT",
+      bedrooms: 3,
+      bathrooms: 4,
+      area: 2200,
+      view: "Burj Khalifa & Fountain Sunset View",
+      basePrice: 4100000,
+      finalPrice: 4350000,
     },
-  });
-
-  // 4. Units / Inventory (50+ units, 100% AVAILABLE)
-  console.log("Creating units...");
-  const unitList = [];
-
-  // Tower East Units (Floors 1 to 15, 3 units per floor)
-  const views = ["Marina Sea View", "Yacht Club View", "City Skyline", "Courtyard View"];
-  for (let floor = 1; floor <= 15; floor++) {
-    for (let u = 1; u <= 3; u++) {
-      const bedrooms = u === 1 ? 1 : u === 2 ? 2 : 3;
-      const area = bedrooms === 1 ? 850 : bedrooms === 2 ? 1350 : 2100;
-      const basePrice = bedrooms === 1 ? 1350000 : bedrooms === 2 ? 2200000 : 3400000;
-      const floorPremium = floor * 15000;
-      const viewPremium = u === 1 ? 75000 : u === 2 ? 120000 : 200000;
-      const addCharges = 35000;
-      const finalPrice = basePrice + floorPremium + viewPremium + addCharges;
-
-      unitList.push({
-        unitNumber: `MTE-${floor.toString().padStart(2, "0")}${u.toString().padStart(2, "0")}`,
-        projectId: p1.id,
-        buildingId: b1.id,
-        floor,
-        unitType: "APARTMENT",
-        bedrooms,
-        bathrooms: bedrooms + 1,
-        area,
-        areaUnit: "SQFT",
-        view: views[(floor + u) % views.length],
-        facing: u === 1 ? "North-East" : u === 2 ? "South-East" : "West",
-        basePrice,
-        floorPremium,
-        viewPremium,
-        additionalCharges: addCharges,
-        finalPrice,
-        status: "AVAILABLE",
-      });
-    }
-  }
-
-  // Palm Vista Villas
-  for (let v = 1; v <= 10; v++) {
-    const bedrooms = v <= 5 ? 5 : 6;
-    const area = bedrooms === 5 ? 7200 : 9800;
-    const basePrice = bedrooms === 5 ? 16500000 : 28000000;
-    const viewPremium = v <= 3 ? 2000000 : 1000000;
-    const addCharges = 150000;
-    const finalPrice = basePrice + viewPremium + addCharges;
-
-    unitList.push({
-      unitNumber: `PVM-VILLA-${v.toString().padStart(2, "0")}`,
-      projectId: p2.id,
-      buildingId: null,
-      floor: 0,
-      unitType: "VILLA",
-      bedrooms,
-      bathrooms: bedrooms + 2,
-      area,
-      areaUnit: "SQFT",
-      view: v <= 4 ? "Direct Private Beachfront" : "Sunset Palm Lagoon",
-      facing: v % 2 === 0 ? "North" : "South",
-      basePrice,
-      floorPremium: 0,
-      viewPremium,
-      additionalCharges: addCharges,
-      finalPrice,
-      status: "AVAILABLE",
-    });
-  }
-
-  // Downtown Penthouses
-  for (let pt = 1; pt <= 6; pt++) {
-    const bedrooms = 4;
-    const area = 5500;
-    const basePrice = 8500000 + pt * 800000;
-    const finalPrice = basePrice + 350000;
-
-    unitList.push({
-      unitNumber: `DHT-PH-${pt.toString().padStart(2, "0")}`,
-      projectId: p3.id,
-      buildingId: b3.id,
-      floor: 40 + pt,
+    {
+      unitNumber: "DCR-PH-01",
+      floor: 45,
       unitType: "PENTHOUSE",
-      bedrooms,
+      bedrooms: 4,
       bathrooms: 5,
-      area,
-      areaUnit: "SQFT",
-      view: "Burj Khalifa & Fountain View",
-      facing: "South-West",
-      basePrice,
-      floorPremium: pt * 100000,
-      viewPremium: 250000,
-      additionalCharges: 50000,
-      finalPrice,
-      status: "AVAILABLE",
+      area: 5400,
+      view: "360-Degree Panoramic Sky View",
+      basePrice: 9200000,
+      finalPrice: 9800000,
+    },
+  ];
+
+  for (const u of p1Units) {
+    await prisma.unit.create({
+      data: {
+        unitNumber: u.unitNumber,
+        projectId: p1.id,
+        buildingId: p1.buildings[0]?.id || null,
+        floor: u.floor,
+        unitType: u.unitType,
+        bedrooms: u.bedrooms,
+        bathrooms: u.bathrooms,
+        area: u.area,
+        areaUnit: "SQFT",
+        view: u.view,
+        basePrice: u.basePrice,
+        finalPrice: u.finalPrice,
+        status: "AVAILABLE",
+        facing: JSON.stringify({
+          images: [DOWNTOWN_IMAGE, DOWNTOWN_FALLBACK],
+          videoUrl: "https://www.youtube.com/watch?v=ScMzIvxBSi4",
+        }),
+      },
     });
   }
 
-  await prisma.unit.createMany({ data: unitList });
+  const p2Units = [
+    {
+      unitNumber: "PIV-V01",
+      floor: 1,
+      unitType: "VILLA",
+      bedrooms: 4,
+      bathrooms: 5,
+      area: 6200,
+      view: "Private Beach & Arabian Gulf View",
+      basePrice: 15500000,
+      finalPrice: 16500000,
+    },
+    {
+      unitNumber: "PIV-V02",
+      floor: 1,
+      unitType: "VILLA",
+      bedrooms: 5,
+      bathrooms: 6,
+      area: 7800,
+      view: "Sunset Sea & Atlantis Panorama",
+      basePrice: 19800000,
+      finalPrice: 21000000,
+    },
+    {
+      unitNumber: "PIV-V03",
+      floor: 1,
+      unitType: "VILLA",
+      bedrooms: 5,
+      bathrooms: 6,
+      area: 8200,
+      view: "Full Open Sea & Marina Skyline",
+      basePrice: 21200000,
+      finalPrice: 22500000,
+    },
+    {
+      unitNumber: "PIV-V04",
+      floor: 2,
+      unitType: "VILLA",
+      bedrooms: 6,
+      bathrooms: 7,
+      area: 9900,
+      view: "Direct Lagoon & Royal Beach View",
+      basePrice: 26500000,
+      finalPrice: 28000000,
+    },
+    {
+      unitNumber: "PIV-V05",
+      floor: 2,
+      unitType: "VILLA",
+      bedrooms: 6,
+      bathrooms: 8,
+      area: 11500,
+      view: "Tip of the Frond Panoramic Ocean",
+      basePrice: 32000000,
+      finalPrice: 34000000,
+    },
+  ];
+
+  for (const u of p2Units) {
+    await prisma.unit.create({
+      data: {
+        unitNumber: u.unitNumber,
+        projectId: p2.id,
+        buildingId: p2.buildings[0]?.id || null,
+        floor: u.floor,
+        unitType: u.unitType,
+        bedrooms: u.bedrooms,
+        bathrooms: u.bathrooms,
+        area: u.area,
+        areaUnit: "SQFT",
+        view: u.view,
+        basePrice: u.basePrice,
+        finalPrice: u.finalPrice,
+        status: "AVAILABLE",
+        facing: JSON.stringify({
+          images: [PALM_IMAGE, PALM_FALLBACK],
+          videoUrl: "https://www.youtube.com/watch?v=ScMzIvxBSi4",
+        }),
+      },
+    });
+  }
 
   console.log("✅ Seed completed successfully with core users, projects, and inventory units. Zero dummy leads seeded.");
 }

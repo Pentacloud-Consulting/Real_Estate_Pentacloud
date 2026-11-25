@@ -1163,7 +1163,7 @@ export default function LeadDetailPage({
                     ) : (
                       <div className="flex-1 flex items-center justify-between gap-2 overflow-hidden">
                         <span className="font-semibold text-slate-800 text-xs truncate">
-                          {lead.project?.name ? `${lead.project.name} (${lead.project.code})` : lead.interestedProject || "Azure Marina Residences (AMR)"}
+                          {lead.project?.name ? `${lead.project.name} (${lead.project.code})` : lead.interestedProject || "Downtown Crown Residences (DCR)"}
                         </span>
                         <button
                           type="button"
