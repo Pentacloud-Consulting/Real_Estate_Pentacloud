@@ -1568,7 +1568,11 @@ export default function OpportunityDetailPage({
                       >
                         <option value="">Pending Shortlisting / None</option>
                         {units
-                          .filter((u) => !editForm.projectId || u.projectId === editForm.projectId || u.id === editForm.unitId)
+                          .filter(
+                            (u) =>
+                              (!editForm.projectId || u.projectId === editForm.projectId) &&
+                              (u.status === "AVAILABLE" || u.id === editForm.unitId || u.id === opp.unitId)
+                          )
                           .map((u) => (
                             <option key={u.id} value={u.id}>
                               Unit #{u.unitNumber} {u.building?.name ? `(${u.building.name})` : ""} - AED {u.finalPrice?.toLocaleString() || "N/A"}
@@ -1595,7 +1599,7 @@ export default function OpportunityDetailPage({
                   {/* Scheduled Unit Visit */}
                   <div className="border-b border-slate-100 py-2 px-3 hover:bg-slate-50/70 transition-colors flex items-center justify-between group min-h-[46px]">
                     <div className="text-xs font-medium text-slate-500 w-[38%] shrink-0 pr-2">
-                      Scheduled Unit Visit
+                      Scheduled Unit Visit (Viewing Slot)
                     </div>
                     {isInlineEditing ? (
                       <input
@@ -2871,7 +2875,11 @@ export default function OpportunityDetailPage({
                   >
                     <option value="">-- Select Unit --</option>
                     {units
-                      .filter((u) => !quoteForm.projectId || u.projectId === quoteForm.projectId || u.id === quoteForm.unitId)
+                      .filter(
+                        (u) =>
+                          (!quoteForm.projectId || u.projectId === quoteForm.projectId) &&
+                          (u.status === "AVAILABLE" || u.id === quoteForm.unitId || u.id === opp.unitId)
+                      )
                       .map((u) => (
                         <option key={u.id} value={u.id}>
                           Unit #{u.unitNumber} {u.building?.name ? `(${u.building.name})` : ""} - AED {u.finalPrice?.toLocaleString() || "N/A"}
@@ -3648,7 +3656,11 @@ export default function OpportunityDetailPage({
                     >
                       <option value="">Pending Shortlisting / None</option>
                       {units
-                        .filter((u) => !editForm.projectId || u.projectId === editForm.projectId || u.id === editForm.unitId)
+                        .filter(
+                          (u) =>
+                            (!editForm.projectId || u.projectId === editForm.projectId) &&
+                            (u.status === "AVAILABLE" || u.id === editForm.unitId || u.id === opp.unitId)
+                        )
                         .map((u) => (
                           <option key={u.id} value={u.id}>
                             Unit #{u.unitNumber} {u.building?.name ? `(${u.building.name})` : ""} - AED {u.finalPrice?.toLocaleString() || "N/A"}
@@ -3659,7 +3671,7 @@ export default function OpportunityDetailPage({
 
                   <div>
                     <label className="block font-semibold text-slate-700 mb-1">
-                      Schedule Unit (Apartment Visit Date & Time)
+                      Scheduled Unit Visit (Viewing Slot)
                     </label>
                     <input
                       type="datetime-local"

@@ -452,7 +452,7 @@ export default function AccountDetailPage({
 
           <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
-              Deals Won
+              Opportunities Won
             </span>
             <span className="text-xl font-bold text-slate-900 mt-0.5 block">
               {metrics.wonOpps}

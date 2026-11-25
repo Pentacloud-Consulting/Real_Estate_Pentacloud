@@ -21,6 +21,10 @@ import {
   ExternalLink,
   Flame,
   ArrowRight,
+  Upload,
+  Download,
+  FileSpreadsheet,
+  Check,
 } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
 import { formatDate, formatCurrency } from "@/lib/utils";
@@ -103,6 +107,115 @@ export default function LeadsPage() {
   const [savingEdit, setSavingEdit] = useState(false);
   const [projectsList, setProjectsList] = useState<any[]>([]);
   const [unitsList, setUnitsList] = useState<any[]>([]);
+
+  // Bulk Import State
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [parsedLeads, setParsedLeads] = useState<any[]>([]);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<any | null>(null);
+
+  const handleDownloadTemplate = () => {
+    const csvContent =
+      "First Name,Last Name,Company,Email,Mobile Phone,WhatsApp,Source,Rating,Status,Estimated Budget,Project Development,Allocated Unit,Qualification Notes\n" +
+      'Mohamed,Waseem,Al Futtaim Group,m.waseem@alfuttaim.example.ae,+971509990092,+971509990092,WEBSITE,HOT,QUALIFIED,12500000,Downtown Heights Tower,Unit #DHT-PH-01,VIP buyer looking for premium high floor penthouse\n' +
+      'Elena,Rostova,Nordic Holdings,elena.rostova@nordic.example.com,+971552345678,+971552345678,CAMPAIGN,WARM,NEW,2800000,Azure Marina Residences,,Investor seeking high rental yield 2-bedroom';
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", "leads_bulk_import_template.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const parseCSV = (text: string): Array<Record<string, string>> => {
+    const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+    if (lines.length < 2) return [];
+
+    const parseRow = (line: string): string[] => {
+      const row: string[] = [];
+      let insideQuotes = false;
+      let entry = "";
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        if (char === '"') {
+          insideQuotes = !insideQuotes;
+        } else if (char === "," && !insideQuotes) {
+          row.push(entry.trim());
+          entry = "";
+        } else {
+          entry += char;
+        }
+      }
+      row.push(entry.trim());
+      return row.map((val) => val.replace(/^["']|["']$/g, "").trim());
+    };
+
+    const headers = parseRow(lines[0]);
+    const rows: Array<Record<string, string>> = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      const values = parseRow(lines[i]);
+      if (values.every((v) => !v)) continue;
+      const item: Record<string, string> = {};
+      headers.forEach((h, idx) => {
+        item[h] = values[idx] || "";
+      });
+      rows.push(item);
+    }
+    return rows;
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImportFile(file);
+    setImportResult(null);
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const content = event.target?.result as string;
+        const parsed = parseCSV(content);
+        if (parsed.length === 0) {
+          addToast("error", "No valid lead rows detected in the CSV file.");
+          return;
+        }
+        setParsedLeads(parsed);
+      } catch {
+        addToast("error", "Error reading CSV file. Please verify format.");
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const handleExecuteImport = async () => {
+    if (parsedLeads.length === 0) return;
+    setImporting(true);
+    try {
+      const res = await fetch("/api/leads/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leads: parsedLeads }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        addToast("success", `Successfully imported ${data.importedCount} leads! (${data.skippedCount} skipped/duplicates)`);
+        setImportResult(data);
+        fetchLeads();
+      } else {
+        addToast("error", data.error || "Failed to import leads");
+      }
+    } catch {
+      addToast("error", "Failed to connect to import service");
+    } finally {
+      setImporting(false);
+    }
+  };
 
   // Form State
   const [form, setForm] = useState({
@@ -324,7 +437,20 @@ export default function LeadsPage() {
             Manage incoming prospects, qualify opportunities, and convert to Contacts & Accounts
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => {
+              setImportFile(null);
+              setParsedLeads([]);
+              setImportResult(null);
+              setShowImportModal(true);
+            }}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-sm font-semibold transition-colors shadow-2xs"
+            title="Import Leads from CSV"
+          >
+            <Upload className="w-4 h-4 text-slate-500" />
+            Import Leads
+          </button>
           <button
             onClick={() => setShowCreateModal(true)}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition-colors shadow-xs"
@@ -843,7 +969,11 @@ export default function LeadsPage() {
                     >
                       <option value="">-- Select Allocated Unit --</option>
                       {unitsList
-                        .filter((u) => !form.projectId || u.projectId === form.projectId || u.id === form.unitId)
+                        .filter(
+                          (u) =>
+                            (!form.projectId || u.projectId === form.projectId) &&
+                            u.status === "AVAILABLE"
+                        )
                         .map((u) => (
                           <option key={u.id} value={u.id}>
                             Unit #{u.unitNumber} {u.building?.name ? `(${u.building.name})` : ""} - AED {u.finalPrice?.toLocaleString() || "N/A"}
@@ -1212,7 +1342,11 @@ export default function LeadsPage() {
                     >
                       <option value="">-- Select Allocated Unit --</option>
                       {unitsList
-                        .filter((u) => !editForm.projectId || u.projectId === editForm.projectId || u.id === editForm.unitId)
+                        .filter(
+                          (u) =>
+                            (!editForm.projectId || u.projectId === editForm.projectId) &&
+                            (u.status === "AVAILABLE" || u.id === editForm.unitId)
+                        )
                         .map((u) => (
                           <option key={u.id} value={u.id}>
                             Unit #{u.unitNumber} {u.building?.name ? `(${u.building.name})` : ""} - AED {u.finalPrice?.toLocaleString() || "N/A"}
@@ -1241,6 +1375,219 @@ export default function LeadsPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Import Leads Modal */}
+      {showImportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 animate-in fade-in">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-3xl max-h-[92vh] overflow-y-auto">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between sticky top-0 bg-white z-10">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100">
+                  <FileSpreadsheet className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-slate-900">Import Bulk Leads</h2>
+                  <p className="text-xs text-slate-500">
+                    Upload a CSV file of prospects to import records into the CRM in bulk
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowImportModal(false)}
+                className="text-slate-400 hover:text-slate-600 text-lg font-bold p-1 rounded-md hover:bg-slate-100"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5 text-xs">
+              {/* Template Download Banner */}
+              <div className="bg-blue-50/60 border border-blue-100 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h4 className="font-bold text-blue-900 text-xs flex items-center gap-1.5">
+                    <FileSpreadsheet className="w-4 h-4 text-blue-600" />
+                    Standard CSV Import Template
+                  </h4>
+                  <p className="text-[11px] text-blue-700 mt-0.5">
+                    Use our standard format with pre-configured columns: Name, Mobile, Email, Company, Project, Unit, Budget
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleDownloadTemplate}
+                  className="px-3 py-1.5 bg-white border border-blue-200 hover:bg-blue-50 text-blue-700 font-semibold rounded-lg text-xs flex items-center gap-1.5 shrink-0 shadow-2xs transition-colors"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Download Sample CSV
+                </button>
+              </div>
+
+              {/* Upload Dropzone */}
+              {!importResult && (
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-2">
+                    Select CSV File
+                  </label>
+                  <div className="border-2 border-dashed border-slate-200 hover:border-blue-400 rounded-2xl p-6 text-center transition-all bg-slate-50/50 hover:bg-blue-50/20">
+                    <input
+                      type="file"
+                      accept=".csv,text/csv,text/plain"
+                      onChange={handleFileChange}
+                      className="hidden"
+                      id="bulk-lead-csv-input"
+                    />
+                    <label htmlFor="bulk-lead-csv-input" className="cursor-pointer space-y-2 block">
+                      <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mx-auto border border-blue-200">
+                        <Upload className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <span className="font-bold text-blue-600 hover:underline text-xs block">
+                          {importFile ? importFile.name : "Click to browse or drop CSV file here"}
+                        </span>
+                        <span className="text-[11px] text-slate-400 block mt-0.5">
+                          {importFile
+                            ? `${(importFile.size / 1024).toFixed(1)} KB • ${parsedLeads.length} leads parsed`
+                            : "Supports .CSV formatted files with headers (up to 500 leads per batch)"}
+                        </span>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              {/* Parsed Preview Table */}
+              {parsedLeads.length > 0 && !importResult && (
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-700 text-xs">
+                      Preview Parsed Data ({parsedLeads.length} leads detected)
+                    </span>
+                    <span className="text-[11px] text-emerald-600 font-semibold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                      Ready to import
+                    </span>
+                  </div>
+
+                  <div className="border border-slate-200 rounded-xl overflow-x-auto max-h-56">
+                    <table className="w-full text-left text-[11px]">
+                      <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold sticky top-0">
+                        <tr>
+                          <th className="p-2.5">#</th>
+                          <th className="p-2.5">Name</th>
+                          <th className="p-2.5">Company</th>
+                          <th className="p-2.5">Mobile Phone</th>
+                          <th className="p-2.5">Email</th>
+                          <th className="p-2.5">Project</th>
+                          <th className="p-2.5">Budget (AED)</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {parsedLeads.slice(0, 5).map((row, idx) => {
+                          const name =
+                            row.name ||
+                            row.fullName ||
+                            row["Full Name"] ||
+                            `${row.firstName || row["First Name"] || ""} ${row.lastName || row["Last Name"] || ""}`.trim() ||
+                            "Unnamed";
+                          const company = row.company || row["Company"] || row["Company Name"] || "-";
+                          const mobile = row.mobile || row.phone || row["Mobile Phone"] || row["Mobile"] || "-";
+                          const email = row.email || row["Email"] || row["Email Address"] || "-";
+                          const project = row.project || row["Project Development"] || row["Project"] || "-";
+                          const budget = row.budget || row.budgetMax || row["Estimated Budget"] || row["Budget"] || "-";
+
+                          return (
+                            <tr key={idx} className="hover:bg-slate-50/70">
+                              <td className="p-2.5 text-slate-400 font-mono">{idx + 1}</td>
+                              <td className="p-2.5 font-bold text-slate-900">{name}</td>
+                              <td className="p-2.5 text-slate-600">{company}</td>
+                              <td className="p-2.5 text-slate-600 font-mono">{mobile}</td>
+                              <td className="p-2.5 text-slate-600">{email}</td>
+                              <td className="p-2.5 text-slate-600">{project}</td>
+                              <td className="p-2.5 font-semibold text-blue-600">{budget}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {parsedLeads.length > 5 && (
+                    <p className="text-[11px] text-slate-400 text-center italic">
+                      ... and {parsedLeads.length - 5} additional leads will be processed during import.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Import Result Screen */}
+              {importResult && (
+                <div className="bg-emerald-50/60 border border-emerald-200 rounded-2xl p-6 text-center space-y-3 animate-in zoom-in-95">
+                  <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto border border-emerald-300">
+                    <CheckCircle2 className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-900 text-base">Bulk Import Completed!</h3>
+                    <p className="text-xs text-slate-600 mt-1">
+                      <strong className="text-emerald-700 font-bold">{importResult.importedCount}</strong> new leads were successfully imported into your CRM.
+                      {importResult.skippedCount > 0 && (
+                        <span> ({importResult.skippedCount} rows skipped or duplicate).</span>
+                      )}
+                    </p>
+                  </div>
+                  {importResult.errors?.length > 0 && (
+                    <div className="bg-white p-3 rounded-lg border border-emerald-200 text-left text-[11px] text-amber-700 max-h-24 overflow-y-auto">
+                      <span className="font-bold block mb-1">Notes / Skipped items:</span>
+                      <ul className="list-disc pl-4 space-y-0.5">
+                        {importResult.errors.map((err: string, i: number) => (
+                          <li key={i}>{err}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Modal Action Buttons */}
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setShowImportModal(false)}
+                  className="px-4 py-2 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-lg font-semibold"
+                >
+                  {importResult ? "Close" : "Cancel"}
+                </button>
+                {!importResult && (
+                  <button
+                    type="button"
+                    disabled={parsedLeads.length === 0 || importing}
+                    onClick={handleExecuteImport}
+                    className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold disabled:opacity-50 flex items-center gap-2 shadow-xs transition-colors"
+                  >
+                    <Upload className="w-4 h-4" />
+                    {importing
+                      ? "Importing Leads..."
+                      : `Import ${parsedLeads.length > 0 ? parsedLeads.length : ""} Leads Now`}
+                  </button>
+                )}
+                {importResult && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowImportModal(false);
+                      setParsedLeads([]);
+                      setImportFile(null);
+                      setImportResult(null);
+                    }}
+                    className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold shadow-xs"
+                  >
+                    View Leads
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}

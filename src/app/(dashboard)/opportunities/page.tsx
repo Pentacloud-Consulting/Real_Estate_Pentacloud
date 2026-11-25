@@ -895,7 +895,11 @@ export default function OpportunitiesPage() {
                     >
                       <option value="">Pending Shortlisting / None</option>
                       {unitsList
-                        .filter((u) => !editForm.projectId || u.projectId === editForm.projectId || u.id === editForm.unitId)
+                        .filter(
+                          (u) =>
+                            (!editForm.projectId || u.projectId === editForm.projectId) &&
+                            (u.status === "AVAILABLE" || u.id === editForm.unitId)
+                        )
                         .map((u) => (
                           <option key={u.id} value={u.id}>
                             Unit #{u.unitNumber} {u.building?.name ? `(${u.building.name})` : ""} - AED {u.finalPrice?.toLocaleString() || "N/A"}
@@ -907,7 +911,7 @@ export default function OpportunitiesPage() {
                   {/* Row 2: Schedule Unit Visit (Left) & Payment Method (Right) */}
                   <div>
                     <label className="block font-semibold text-slate-700 mb-1">
-                      Schedule Unit (Apartment Visit Date & Time)
+                      Scheduled Unit Visit (Viewing Slot)
                     </label>
                     <input
                       type="datetime-local"
@@ -1127,7 +1131,7 @@ export default function OpportunitiesPage() {
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Schedule Unit Visit</label>
+                  <label className="block font-semibold text-slate-700 mb-1">Scheduled Unit Visit (Viewing Slot)</label>
                   <input
                     type="datetime-local"
                     value={createForm.scheduledVisitDate}

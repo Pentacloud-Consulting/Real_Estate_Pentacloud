@@ -11,10 +11,11 @@ import {
   Building2,
   Handshake,
   Boxes,
+  Home,
   FileSignature,
   Receipt,
   ShoppingCart,
-  Activity,
+  Share2,
   BarChart3,
   Settings,
   ChevronLeft,
@@ -53,6 +54,7 @@ const NAV_SECTIONS: NavSection[] = [
       { name: "Brokers", href: "/brokers", icon: Handshake },
       { name: "Projects", href: "/projects", icon: Building2 },
       { name: "Inventory", href: "/inventory", icon: Boxes },
+      { name: "Property Listings", href: "/listings", icon: Home },
     ],
   },
   {
@@ -66,7 +68,7 @@ const NAV_SECTIONS: NavSection[] = [
   {
     title: "Analytics & Settings",
     items: [
-      { name: "Activities", href: "/activities", icon: Activity },
+      { name: "Integrations", href: "/integrations", icon: Share2 },
       { name: "Reports", href: "/reports", icon: BarChart3 },
       { name: "Settings", href: "/settings", icon: Settings },
     ],

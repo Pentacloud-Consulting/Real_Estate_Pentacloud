@@ -1199,7 +1199,11 @@ export default function LeadDetailPage({
                       >
                         <option value="">Pending Shortlisting / None</option>
                         {unitsList
-                          .filter((u) => !editForm.projectId || u.projectId === editForm.projectId || u.id === editForm.unitId)
+                          .filter(
+                            (u) =>
+                              (!editForm.projectId || u.projectId === editForm.projectId) &&
+                              (u.status === "AVAILABLE" || u.id === editForm.unitId)
+                          )
                           .map((u) => (
                             <option key={u.id} value={u.id}>
                               Unit #{u.unitNumber} {u.building?.name ? `(${u.building.name})` : ""} - AED {u.finalPrice?.toLocaleString() || "N/A"}
@@ -2206,7 +2210,11 @@ export default function LeadDetailPage({
                           >
                             <option value="">-- Select Allocated Unit --</option>
                             {unitsList
-                              .filter((u) => !convertForm.projectId || u.projectId === convertForm.projectId || u.id === convertForm.unitId)
+                              .filter(
+                                (u) =>
+                                  (!convertForm.projectId || u.projectId === convertForm.projectId) &&
+                                  (u.status === "AVAILABLE" || u.id === convertForm.unitId)
+                              )
                               .map((u) => (
                                 <option key={u.id} value={u.id}>
                                   Unit #{u.unitNumber} {u.building?.name ? `(${u.building.name})` : ""} - AED {u.finalPrice?.toLocaleString() || "N/A"}
@@ -2242,7 +2250,7 @@ export default function LeadDetailPage({
                       </div>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="block text-slate-600 font-medium mb-1">Schedule Unit Visit</label>
+                          <label className="block text-slate-600 font-medium mb-1">Scheduled Unit Visit (Viewing Slot)</label>
                           <input
                             type="datetime-local"
                             value={convertForm.scheduledVisitDate}
@@ -2287,25 +2295,7 @@ export default function LeadDetailPage({
                   )}
                 </div>
 
-                {/* 4. Broker / Channel Partner attribution */}
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
-                    <Handshake className="w-4 h-4 text-blue-600" />
-                    Channel Partner / Broker Attribution
-                  </label>
-                  <select
-                    value={convertForm.brokerId}
-                    onChange={(e) => setConvertForm({ ...convertForm, brokerId: e.target.value })}
-                    className="w-full p-2.5 border border-slate-200 rounded-lg bg-white text-slate-800 focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
-                  >
-                    <option value="">-- Select Broker --</option>
-                    {brokersList.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        {b.name}{b.contactPerson && b.contactPerson !== b.name ? ` (${b.contactPerson})` : ""} {b.tradeLicense ? `[${b.tradeLicense}]` : ""}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+
 
                 <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
                   <button

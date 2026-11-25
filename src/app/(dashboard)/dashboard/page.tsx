@@ -215,7 +215,7 @@ export default function DashboardPage() {
 
         <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs flex items-center justify-between">
           <div>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Deals Won</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Opportunities Won</span>
             <span className="text-xl font-bold text-blue-600 block mt-0.5">{kpis.wonOpportunities}</span>
           </div>
           <CheckCircle2 className="w-5 h-5 text-blue-600" />
@@ -223,7 +223,7 @@ export default function DashboardPage() {
 
         <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs flex items-center justify-between">
           <div>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Deals Lost</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Opportunities Lost</span>
             <span className="text-xl font-bold text-slate-500 block mt-0.5">{kpis.lostOpportunities}</span>
           </div>
           <AlertCircle className="w-5 h-5 text-slate-400" />
