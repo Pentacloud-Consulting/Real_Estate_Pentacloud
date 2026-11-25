@@ -43,6 +43,20 @@ export async function GET(
         },
         documents: {
           orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            fileName: true,
+            originalName: true,
+            mimeType: true,
+            fileSize: true,
+            category: true,
+            docType: true,
+            status: true,
+            createdAt: true,
+            updatedAt: true,
+            opportunityId: true,
+            buyerId: true,
+          },
         },
         activities: {
           orderBy: { createdAt: "desc" },

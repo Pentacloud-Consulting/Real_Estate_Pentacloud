@@ -122,38 +122,108 @@ export default function OpportunityDetailPage({
 
   const handleInternalKycUpload = async (docType: string, file: File) => {
     if (!file) return;
-    if (file.size > 25 * 1024 * 1024) {
-      addToast("error", "File size exceeds 25 MB limit");
-      return;
-    }
     setUploadingDocType(docType);
     try {
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const base64Data = reader.result as string;
-        const res = await fetch(`/api/kyc/${id}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            docType,
-            fileName: file.name,
-            fileData: base64Data,
-            fileSize: file.size,
-            mimeType: file.type || "application/octet-stream",
-          }),
+      const isImage = file.type.startsWith("image/") || /\.(jpe?g|png|webp|heic)$/i.test(file.name);
+      let fileData: string;
+      let fileName = file.name;
+      let fileSize = file.size;
+      let mimeType = file.type || "application/octet-stream";
+
+      if (isImage) {
+        const compressed = await new Promise<{ fileData: string; fileName: string; fileSize: number; mimeType: string }>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onerror = () => reject(new Error("Unable to read image"));
+          reader.onload = () => {
+            const img = new Image();
+            img.onerror = () => {
+              resolve({
+                fileData: reader.result as string,
+                fileName: file.name,
+                fileSize: file.size,
+                mimeType: file.type || "image/jpeg",
+              });
+            };
+            img.onload = () => {
+              try {
+                const canvas = document.createElement("canvas");
+                let { width, height } = img;
+                const maxDim = 1600;
+                if (width > maxDim || height > maxDim) {
+                  if (width > height) {
+                    height = Math.round((height * maxDim) / width);
+                    width = maxDim;
+                  } else {
+                    width = Math.round((width * maxDim) / height);
+                    height = maxDim;
+                  }
+                }
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext("2d");
+                if (!ctx) {
+                  resolve({ fileData: reader.result as string, fileName: file.name, fileSize: file.size, mimeType: file.type || "image/jpeg" });
+                  return;
+                }
+                ctx.drawImage(img, 0, 0, width, height);
+                const compressedDataUrl = canvas.toDataURL("image/jpeg", 0.82);
+                const base64Len = compressedDataUrl.length - (compressedDataUrl.indexOf(",") + 1);
+                resolve({
+                  fileData: compressedDataUrl,
+                  fileName: file.name.replace(/\.[^/.]+$/, "") + ".jpg",
+                  fileSize: Math.round((base64Len * 3) / 4),
+                  mimeType: "image/jpeg",
+                });
+              } catch {
+                resolve({ fileData: reader.result as string, fileName: file.name, fileSize: file.size, mimeType: file.type || "image/jpeg" });
+              }
+            };
+            img.src = reader.result as string;
+          };
+          reader.readAsDataURL(file);
         });
-        const d = await res.json();
-        if (res.ok) {
-          addToast("success", "KYC document uploaded successfully!");
-          fetchOpportunity();
-        } else {
-          addToast("error", d.error || "Failed to upload document");
+        fileData = compressed.fileData;
+        fileName = compressed.fileName;
+        fileSize = compressed.fileSize;
+        mimeType = compressed.mimeType;
+      } else {
+        if (file.size > 4.2 * 1024 * 1024) {
+          throw new Error("PDF file size exceeds 4.2 MB limit. Please compress scan.");
         }
-        setUploadingDocType(null);
-      };
-      reader.readAsDataURL(file);
-    } catch {
-      addToast("error", "Error uploading document");
+        fileData = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onerror = () => reject(new Error("Unable to read PDF"));
+          reader.onload = () => resolve(reader.result as string);
+          reader.readAsDataURL(file);
+        });
+      }
+
+      const res = await fetch(`/api/kyc/${id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          docType,
+          fileName,
+          fileData,
+          fileSize,
+          mimeType,
+        }),
+      });
+
+      let d: any = {};
+      try {
+        d = await res.json();
+      } catch {}
+
+      if (res.ok) {
+        addToast("success", "KYC document uploaded successfully!");
+        fetchOpportunity();
+      } else {
+        addToast("error", d?.error || `Upload failed (${res.status})`);
+      }
+    } catch (err: any) {
+      addToast("error", err?.message || "Error uploading document");
+    } finally {
       setUploadingDocType(null);
     }
   };
@@ -2410,9 +2480,9 @@ export default function OpportunityDetailPage({
 
                     {/* Actions */}
                     <div className="shrink-0 flex items-center gap-2 flex-wrap">
-                      {isUploaded && uploadedDoc.filePath && (
+                      {isUploaded && (uploadedDoc.fileUrl || uploadedDoc.filePath || uploadedDoc.id) && (
                         <a
-                          href={uploadedDoc.filePath}
+                          href={uploadedDoc.fileUrl || `/api/kyc/files/${uploadedDoc.id}`}
                           target="_blank"
                           rel="noreferrer"
                           className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs transition-colors flex items-center gap-1 shadow-2xs"

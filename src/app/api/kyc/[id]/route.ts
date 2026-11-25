@@ -103,7 +103,6 @@ export async function GET(
             originalName: true,
             mimeType: true,
             fileSize: true,
-            filePath: true,
             category: true,
             docType: true,
             status: true,
@@ -130,7 +129,10 @@ export async function GET(
         unit: opportunity.unit,
         advisor: opportunity.assignedAdvisor,
       },
-      documents: opportunity.documents,
+      documents: opportunity.documents.map((d) => ({
+        ...d,
+        fileUrl: `/api/kyc/files/${d.id}`,
+      })),
       documentTypes: KYC_DOCUMENT_TYPES,
     });
   } catch (error) {
@@ -155,6 +157,10 @@ export async function POST(
     }
     if (!fileData || !fileName) {
       return NextResponse.json({ error: "File data and file name are required" }, { status: 400 });
+    }
+
+    if (fileData.length > 6 * 1024 * 1024) {
+      return NextResponse.json({ error: "File is too large. Please upload an image or scan under 4.5 MB." }, { status: 413 });
     }
 
     const opportunity = await prisma.opportunity.findUnique({
@@ -226,7 +232,18 @@ export async function POST(
 
     return NextResponse.json({
       success: true,
-      document,
+      document: {
+        id: document.id,
+        fileName: document.fileName,
+        originalName: document.originalName,
+        mimeType: document.mimeType,
+        fileSize: document.fileSize,
+        category: document.category,
+        docType: document.docType,
+        status: document.status,
+        createdAt: document.createdAt,
+        fileUrl: `/api/kyc/files/${document.id}`,
+      },
       message: `${docTitle} uploaded successfully`,
     });
   } catch (error) {
@@ -271,3 +288,4 @@ export async function PATCH(
     return NextResponse.json({ error: "Failed to update document status" }, { status: 500 });
   }
 }
+

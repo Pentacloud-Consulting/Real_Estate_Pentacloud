@@ -19,6 +19,109 @@ import {
   ArrowRight,
 } from "lucide-react";
 
+// Helper to compress image in browser to avoid Vercel 4.5MB payload limit and make upload instantaneous
+async function compressFileForUpload(file: File): Promise<{
+  fileData: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+}> {
+  const isImage = file.type.startsWith("image/") || /\.(jpe?g|png|webp|heic)$/i.test(file.name);
+
+  if (isImage) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error("Unable to read image file"));
+      reader.onload = () => {
+        const img = new Image();
+        img.onerror = () => {
+          // If browser cannot decode image (e.g. raw HEIC), fall back to raw data if small enough
+          if (file.size > 4 * 1024 * 1024) {
+            reject(new Error("Image is too large (over 4MB). Please take a photo at standard resolution or upload a JPEG/PNG."));
+            return;
+          }
+          resolve({
+            fileData: reader.result as string,
+            fileName: file.name,
+            fileSize: file.size,
+            mimeType: file.type || "image/jpeg",
+          });
+        };
+        img.onload = () => {
+          try {
+            const canvas = document.createElement("canvas");
+            let { width, height } = img;
+            const maxDimension = 1600;
+
+            if (width > maxDimension || height > maxDimension) {
+              if (width > height) {
+                height = Math.round((height * maxDimension) / width);
+                width = maxDimension;
+              } else {
+                width = Math.round((width * maxDimension) / height);
+                height = maxDimension;
+              }
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext("2d");
+            if (!ctx) {
+              resolve({
+                fileData: reader.result as string,
+                fileName: file.name,
+                fileSize: file.size,
+                mimeType: file.type || "image/jpeg",
+              });
+              return;
+            }
+
+            ctx.drawImage(img, 0, 0, width, height);
+            const compressedDataUrl = canvas.toDataURL("image/jpeg", 0.82);
+            const base64Len = compressedDataUrl.length - (compressedDataUrl.indexOf(",") + 1);
+            const approxBytes = Math.round((base64Len * 3) / 4);
+
+            resolve({
+              fileData: compressedDataUrl,
+              fileName: file.name.replace(/\.[^/.]+$/, "") + ".jpg",
+              fileSize: approxBytes,
+              mimeType: "image/jpeg",
+            });
+          } catch {
+            resolve({
+              fileData: reader.result as string,
+              fileName: file.name,
+              fileSize: file.size,
+              mimeType: file.type || "image/jpeg",
+            });
+          }
+        };
+        img.src = reader.result as string;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // Non-image (e.g. PDF)
+  if (file.size > 4.2 * 1024 * 1024) {
+    throw new Error("PDF file size exceeds 4.2 MB limit. Please compress or scan at standard resolution.");
+  }
+
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Unable to read PDF file"));
+    reader.onload = () => {
+      resolve({
+        fileData: reader.result as string,
+        fileName: file.name,
+        fileSize: file.size,
+        mimeType: file.type || "application/pdf",
+      });
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function ClientKycPortalPage({
   params,
 }: {
@@ -56,45 +159,42 @@ export default function ClientKycPortalPage({
   const handleFileUpload = async (docType: string, file: File) => {
     if (!file) return;
 
-    if (file.size > 25 * 1024 * 1024) {
-      alert("File size exceeds 25 MB limit. Please upload a smaller file.");
-      return;
-    }
-
     setUploadingDoc(docType);
     setUploadSuccess(null);
 
     try {
-      // Read file as base64 data URL
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const base64Data = reader.result as string;
+      // Compress in-browser (converts multi-MB phone photos to ~250KB JPEG in < 200ms)
+      const { fileData, fileName, fileSize, mimeType } = await compressFileForUpload(file);
 
-        const res = await fetch(`/api/kyc/${id}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            docType,
-            fileName: file.name,
-            fileData: base64Data,
-            fileSize: file.size,
-            mimeType: file.type || "application/octet-stream",
-          }),
-        });
+      const res = await fetch(`/api/kyc/${id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          docType,
+          fileName,
+          fileData,
+          fileSize,
+          mimeType,
+        }),
+      });
 
-        const resData = await res.json();
-        if (res.ok) {
-          setUploadSuccess(docType);
-          fetchPortalData();
-        } else {
-          alert(resData.error || "Failed to upload document. Please try again.");
-        }
-        setUploadingDoc(null);
-      };
-      reader.readAsDataURL(file);
-    } catch (err) {
-      console.error(err);
-      alert("Error reading file. Please try again.");
+      let resData: any = {};
+      try {
+        resData = await res.json();
+      } catch {
+        // Fallback if server returned text/html (like 413 or 504)
+      }
+
+      if (res.ok) {
+        setUploadSuccess(docType);
+        await fetchPortalData();
+      } else {
+        alert(resData?.error || `Upload failed (${res.status}). Please try again with a smaller file.`);
+      }
+    } catch (err: any) {
+      console.error("Upload error:", err);
+      alert(err.message || "Failed to process document. Please try again.");
+    } finally {
       setUploadingDoc(null);
     }
   };
@@ -366,9 +466,9 @@ export default function ClientKycPortalPage({
                         </span>
                       </label>
 
-                      {isUploaded && uploadedDoc.filePath && (
+                      {isUploaded && (
                         <a
-                          href={uploadedDoc.filePath}
+                          href={uploadedDoc.fileUrl || `/api/kyc/files/${uploadedDoc.id}`}
                           target="_blank"
                           rel="noreferrer"
                           className="p-2 border border-slate-200 hover:bg-blue-50 text-slate-600 hover:text-blue-600 rounded-lg transition-colors"
@@ -399,3 +499,4 @@ export default function ClientKycPortalPage({
     </div>
   );
 }
+
