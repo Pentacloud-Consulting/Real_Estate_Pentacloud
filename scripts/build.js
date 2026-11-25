@@ -25,8 +25,10 @@ if (dbUrl && !dbUrl.startsWith("file:")) {
     execSync("npx prisma db push --accept-data-loss", { stdio: "inherit", env: process.env });
     console.log("[build] Checking database seed status...");
     execSync("npm run db:seed", { stdio: "inherit", env: process.env });
+    console.log("[build] Purging legacy dummy CRM data...");
+    execSync("npx tsx prisma/purge-dummy.ts", { stdio: "inherit", env: process.env });
   } catch (err) {
-    console.warn("[build] Notice during db push/seed:", err.message);
+    console.warn("[build] Notice during db push/seed/purge:", err.message);
   }
 }
 
