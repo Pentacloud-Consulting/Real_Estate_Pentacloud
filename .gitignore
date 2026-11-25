@@ -23,7 +23,6 @@
 # misc
 .DS_Store
 *.pem
-*.db
 *.db-journal
 
 # debug
@@ -35,6 +34,7 @@ yarn-error.log*
 # env files
 .env*
 !.env.example
+!.env.production
 
 # vercel
 .vercel
