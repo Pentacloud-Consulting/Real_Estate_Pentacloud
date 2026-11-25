@@ -48,16 +48,23 @@ export async function POST(request: NextRequest) {
     const token = createToken(authUser);
     await setAuthCookie(token);
 
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { lastLoginAt: new Date() },
-    });
+    try {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { lastLoginAt: new Date() },
+      });
+    } catch (e) {
+      console.warn("Could not update lastLoginAt (ignorable on read-only replicas):", e);
+    }
 
     return NextResponse.json({ user: authUser });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Login error:", error);
     return NextResponse.json(
-      { error: "An error occurred during login" },
+      {
+        error: "An error occurred during login",
+        details: error?.message || String(error),
+      },
       { status: 500 }
     );
   }
