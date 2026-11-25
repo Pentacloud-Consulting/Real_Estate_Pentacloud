@@ -6,7 +6,12 @@ const prisma = new PrismaClient();
 async function main() {
   console.log("Seeding Pentacloud Real Estate Platform Database...");
 
-  // Clean existing tables in correct FK order
+  // Preserve existing data: If database is already populated, skip seed
+  const existingUsersCount = await prisma.user.count().catch(() => 0);
+  if (existingUsersCount > 0) {
+    console.log(`[seed] Database already initialized with ${existingUsersCount} users. Skipping seed to preserve data.`);
+    return;
+  }
   await prisma.documentVerification.deleteMany();
   await prisma.document.deleteMany();
   await prisma.onboardingChecklist.deleteMany();
