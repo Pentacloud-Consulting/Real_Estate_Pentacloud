@@ -85,12 +85,18 @@ export async function POST(
       );
     }
 
-    // Resolve project if any
+    // Resolve project and unit if any
+    const resolvedUnitId = body.unitId || lead.unitId || null;
     let project = null;
     if (body.projectId) {
       project = await prisma.project.findUnique({ where: { id: body.projectId } });
     } else if (lead.projectId) {
       project = await prisma.project.findUnique({ where: { id: lead.projectId } });
+    } else if (resolvedUnitId) {
+      const unitRec = await prisma.unit.findUnique({ where: { id: resolvedUnitId } });
+      if (unitRec?.projectId) {
+        project = await prisma.project.findUnique({ where: { id: unitRec.projectId } });
+      }
     } else if (lead.interestedProject) {
       project = await prisma.project.findFirst({
         where: { name: { contains: lead.interestedProject } },
@@ -210,8 +216,8 @@ export async function POST(
             name: oppName,
             buyerId: targetAccountId,
             contactId: targetContactId,
-            projectId: project ? project.id : null,
-            unitId: body.unitId || lead.unitId || null,
+            projectId: project ? project.id : (body.projectId || lead.projectId || null),
+            unitId: resolvedUnitId,
             propertyType: body.propertyType || lead.propertyType || "APARTMENT",
             estimatedValue: oppAmount,
             amount: oppAmount,

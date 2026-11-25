@@ -40,3 +40,4 @@ export async function GET(
     return new NextResponse("Error serving document", { status: 500 });
   }
 }
+

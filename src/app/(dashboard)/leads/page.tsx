@@ -96,9 +96,13 @@ export default function LeadsPage() {
     requirement: "",
     budgetMax: "2800000",
     propertyType: "APARTMENT",
+    projectId: "",
+    unitId: "",
     qualificationNotes: "",
   });
   const [savingEdit, setSavingEdit] = useState(false);
+  const [projectsList, setProjectsList] = useState<any[]>([]);
+  const [unitsList, setUnitsList] = useState<any[]>([]);
 
   // Form State
   const [form, setForm] = useState({
@@ -123,6 +127,9 @@ export default function LeadsPage() {
     status: "NEW",
     requirement: "",
     budgetMax: "2800000",
+    propertyType: "APARTMENT",
+    projectId: "",
+    unitId: "",
     qualificationNotes: "",
   });
 
@@ -153,6 +160,14 @@ export default function LeadsPage() {
 
   useEffect(() => {
     fetchLeads();
+    fetch("/api/projects")
+      .then((r) => r.json())
+      .then((d) => setProjectsList(d.projects || []))
+      .catch(() => {});
+    fetch("/api/units")
+      .then((r) => r.json())
+      .then((d) => setUnitsList(d.units || []))
+      .catch(() => {});
   }, [fetchLeads]);
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
@@ -168,6 +183,8 @@ export default function LeadsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
+          projectId: form.projectId || undefined,
+          unitId: form.unitId || undefined,
           annualRevenue: form.annualRevenue ? Number(form.annualRevenue) : undefined,
           employees: form.employees ? Number(form.employees) : undefined,
           budgetMax: form.budgetMax ? Number(form.budgetMax) : undefined,
@@ -217,6 +234,8 @@ export default function LeadsPage() {
         requirement: l.requirement || "",
         budgetMax: l.budgetMax ? l.budgetMax.toString() : "2800000",
         propertyType: l.propertyType || "APARTMENT",
+        projectId: l.projectId || l.project?.id || "",
+        unitId: l.unitId || l.unit?.id || "",
         qualificationNotes: l.qualificationNotes || "",
       });
       setShowEditModal(true);
@@ -256,6 +275,8 @@ export default function LeadsPage() {
           requirement: editForm.requirement || null,
           budgetMax: editForm.budgetMax ? Number(editForm.budgetMax) : null,
           propertyType: editForm.propertyType,
+          projectId: editForm.projectId || null,
+          unitId: editForm.unitId || null,
           qualificationNotes: editForm.qualificationNotes || null,
         }),
       });
@@ -778,6 +799,61 @@ export default function LeadsPage() {
                 </div>
               </div>
 
+              {/* E. Project & Inventory Allocation */}
+              <div>
+                <h3 className="font-bold uppercase tracking-wider text-slate-400 mb-3 pb-1 border-b border-slate-100 flex items-center gap-1.5">
+                  <Building2 className="w-3.5 h-3.5 text-blue-600" />
+                  E. Project & Inventory Allocation
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Project Development
+                    </label>
+                    <select
+                      value={form.projectId}
+                      onChange={(e) => setForm({ ...form, projectId: e.target.value, unitId: "" })}
+                      className="w-full p-2 border border-slate-200 rounded-lg bg-white"
+                    >
+                      <option value="">-- Select Project Development --</option>
+                      {projectsList.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} {p.code ? `(${p.code})` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Allocated Unit
+                    </label>
+                    <select
+                      value={form.unitId}
+                      onChange={(e) => {
+                        const selectedUnitId = e.target.value;
+                        const u = unitsList.find((un) => un.id === selectedUnitId);
+                        setForm({
+                          ...form,
+                          unitId: selectedUnitId,
+                          ...(u?.finalPrice ? { budgetMax: u.finalPrice.toString() } : {}),
+                          ...(u?.unitType ? { propertyType: u.unitType } : {}),
+                        });
+                      }}
+                      className="w-full p-2 border border-slate-200 rounded-lg bg-white"
+                    >
+                      <option value="">-- Select Allocated Unit --</option>
+                      {unitsList
+                        .filter((u) => !form.projectId || u.projectId === form.projectId || u.id === form.unitId)
+                        .map((u) => (
+                          <option key={u.id} value={u.id}>
+                            Unit #{u.unitNumber} {u.building?.name ? `(${u.building.name})` : ""} - AED {u.finalPrice?.toLocaleString() || "N/A"}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
               {/* Modal Buttons */}
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
                 <button
@@ -1083,6 +1159,66 @@ export default function LeadsPage() {
                       placeholder="Requirements, purchasing timeline, decision maker status..."
                       className="w-full p-2.5 border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
                     />
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 5: Project & Inventory Allocation */}
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
+                  <h3 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                    <Building2 className="w-3.5 h-3.5 text-blue-600" />
+                    5. Project & Inventory Allocation
+                  </h3>
+                  <span className="text-[10px] text-slate-400 font-medium">Selected Development & Unit</span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Project Development
+                    </label>
+                    <select
+                      value={editForm.projectId}
+                      onChange={(e) => setEditForm({ ...editForm, projectId: e.target.value, unitId: "" })}
+                      className="w-full p-2.5 border border-slate-200 rounded-lg bg-white text-slate-800 focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
+                    >
+                      <option value="">-- Select Project Development --</option>
+                      {projectsList.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} {p.code ? `(${p.code})` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Allocated Unit
+                    </label>
+                    <select
+                      value={editForm.unitId}
+                      onChange={(e) => {
+                        const selectedUnitId = e.target.value;
+                        const u = unitsList.find((un) => un.id === selectedUnitId);
+                        setEditForm({
+                          ...editForm,
+                          unitId: selectedUnitId,
+                          ...(u?.finalPrice ? { budgetMax: u.finalPrice.toString() } : {}),
+                          ...(u?.unitType ? { propertyType: u.unitType } : {}),
+                        });
+                      }}
+                      className="w-full p-2.5 border border-slate-200 rounded-lg bg-white text-slate-800 focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
+                    >
+                      <option value="">-- Select Allocated Unit --</option>
+                      {unitsList
+                        .filter((u) => !editForm.projectId || u.projectId === editForm.projectId || u.id === editForm.unitId)
+                        .map((u) => (
+                          <option key={u.id} value={u.id}>
+                            Unit #{u.unitNumber} {u.building?.name ? `(${u.building.name})` : ""} - AED {u.finalPrice?.toLocaleString() || "N/A"}
+                          </option>
+                        ))}
+                    </select>
                   </div>
                 </div>
               </div>

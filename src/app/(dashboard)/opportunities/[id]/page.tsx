@@ -1541,7 +1541,7 @@ export default function OpportunityDetailPage({
                     ) : (
                       <div className="flex-1 flex items-center justify-between gap-2 overflow-hidden">
                         <span className="font-semibold text-slate-800 text-xs truncate">
-                          {opp.project?.name || "Azure Marina Residences"}
+                          {opp.project?.name ? `${opp.project.name} (${opp.project.code})` : "Azure Marina Residences (AMR)"}
                         </span>
                         <button
                           type="button"
@@ -1578,7 +1578,7 @@ export default function OpportunityDetailPage({
                     ) : (
                       <div className="flex-1 flex items-center justify-between gap-2 overflow-hidden">
                         <span className="font-semibold text-slate-800 text-xs truncate">
-                          {opp.unit ? `Unit #${opp.unit.unitNumber}` : "Pending Shortlisting"}
+                          {opp.unit ? `Unit #${opp.unit.unitNumber} ${opp.unit.building?.name ? `(${opp.unit.building.name})` : ""} - AED ${opp.unit.finalPrice?.toLocaleString() || "N/A"}` : "Pending Shortlisting"}
                         </span>
                         <button
                           type="button"

@@ -80,6 +80,7 @@ export default function LeadDetailPage({
   const [existingContacts, setExistingContacts] = useState<any[]>([]);
   const [brokersList, setBrokersList] = useState<any[]>([]);
   const [projectsList, setProjectsList] = useState<any[]>([]);
+  const [unitsList, setUnitsList] = useState<any[]>([]);
 
   // Tasks / Follow-ups State
   const [followUps, setFollowUps] = useState<any[]>([]);
@@ -114,7 +115,8 @@ export default function LeadDetailPage({
     budgetMax: "2800000",
     qualificationNotes: "",
     brokerId: "",
-    interestedProjectId: "",
+    projectId: "",
+    unitId: "",
     propertyType: "APARTMENT",
     nextFollowUpDate: "",
   });
@@ -158,7 +160,8 @@ export default function LeadDetailPage({
       budgetMax: data.budgetMax ? data.budgetMax.toString() : "2800000",
       qualificationNotes: data.qualificationNotes || "",
       brokerId: data.brokerId || data.broker?.id || "",
-      interestedProjectId: data.interestedProjectId || data.project?.id || "",
+      projectId: data.projectId || data.project?.id || "",
+      unitId: data.unitId || data.unit?.id || "",
       propertyType: data.propertyType || "APARTMENT",
       nextFollowUpDate: data.nextFollowUpDate ? toLocalDatetimeString(new Date(data.nextFollowUpDate)) : "",
     });
@@ -201,7 +204,8 @@ export default function LeadDetailPage({
           budgetMax: editForm.budgetMax ? Number(editForm.budgetMax) : null,
           qualificationNotes: editForm.qualificationNotes || null,
           brokerId: editForm.brokerId || null,
-          interestedProjectId: editForm.interestedProjectId || null,
+          projectId: editForm.projectId || null,
+          unitId: editForm.unitId || null,
           propertyType: editForm.propertyType || "APARTMENT",
           nextFollowUpDate: editForm.nextFollowUpDate ? new Date(editForm.nextFollowUpDate).toISOString() : null,
         }),
@@ -327,6 +331,8 @@ export default function LeadDetailPage({
     opportunityAmount: "2500000",
     opportunityCloseDate: "",
     opportunityStage: "PROSPECTING",
+    projectId: "",
+    unitId: "",
     brokerId: "",
     scheduledVisitDate: "",
     paymentMethod: "",
@@ -353,8 +359,10 @@ export default function LeadDetailPage({
           ...prev,
           accountName: data.lead.company || `${data.lead.firstName} ${data.lead.lastName}`,
           opportunityName: `${data.lead.company || data.lead.firstName + ' ' + data.lead.lastName} - Acquisition Deal`,
-          opportunityAmount: data.lead.budgetMax?.toString() || "2500000",
+          opportunityAmount: data.lead.unit?.finalPrice?.toString() || data.lead.budgetMax?.toString() || "2800000",
           brokerId: data.lead.brokerId || "",
+          projectId: data.lead.projectId || data.lead.project?.id || "",
+          unitId: data.lead.unitId || data.lead.unit?.id || "",
         }));
       } else {
         addToast("error", data.error || "Lead not found");
@@ -385,6 +393,10 @@ export default function LeadDetailPage({
     fetch("/api/projects")
       .then((r) => r.json())
       .then((d) => setProjectsList(d.projects || []))
+      .catch(() => {});
+    fetch("/api/units")
+      .then((r) => r.json())
+      .then((d) => setUnitsList(d.units || []))
       .catch(() => {});
   }, [id]);
 
@@ -1130,34 +1142,84 @@ export default function LeadDetailPage({
               <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-100 p-2 sm:p-4">
                 {/* Left Column */}
                 <div className="space-y-1 md:pr-4">
-                  {/* Target Development */}
+                  {/* Project Development */}
                   <div className="border-b border-slate-100 py-2 px-3 hover:bg-slate-50/70 transition-colors flex items-center justify-between group min-h-[46px]">
                     <div className="text-xs font-medium text-slate-500 w-[38%] shrink-0 pr-2">
-                      Target Project
+                      Project Development
                     </div>
                     {isInlineEditing ? (
                       <select
-                        value={editForm.interestedProjectId}
-                        onChange={(e) => setEditForm({ ...editForm, interestedProjectId: e.target.value })}
+                        value={editForm.projectId}
+                        onChange={(e) => setEditForm({ ...editForm, projectId: e.target.value, unitId: "" })}
                         className="flex-1 px-2.5 py-1.5 text-xs text-slate-800 bg-white border border-slate-300 rounded focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 shadow-xs"
                       >
-                        <option value="">-- General / Azure Marina Residences --</option>
+                        <option value="">-- Select Project Development --</option>
                         {projectsList.map((p) => (
                           <option key={p.id} value={p.id}>
-                            {p.name} ({p.code})
+                            {p.name} {p.code ? `(${p.code})` : ""}
                           </option>
                         ))}
                       </select>
                     ) : (
                       <div className="flex-1 flex items-center justify-between gap-2 overflow-hidden">
                         <span className="font-semibold text-slate-800 text-xs truncate">
-                          {lead.project?.name || lead.interestedProject || "Azure Marina Residences"}
+                          {lead.project?.name ? `${lead.project.name} (${lead.project.code})` : lead.interestedProject || "Azure Marina Residences (AMR)"}
                         </span>
                         <button
                           type="button"
                           onClick={handleStartInlineEdit}
                           className="p-1 text-slate-300 hover:text-blue-600 group-hover:text-slate-500 rounded transition-colors"
-                          title="Edit Target Project"
+                          title="Edit Project Development"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Allocated Unit */}
+                  <div className="border-b border-slate-100 py-2 px-3 hover:bg-slate-50/70 transition-colors flex items-center justify-between group min-h-[46px]">
+                    <div className="text-xs font-medium text-slate-500 w-[38%] shrink-0 pr-2">
+                      Allocated Unit
+                    </div>
+                    {isInlineEditing ? (
+                      <select
+                        value={editForm.unitId}
+                        onChange={(e) => {
+                          const uId = e.target.value;
+                          const u = unitsList.find((un) => un.id === uId);
+                          setEditForm({
+                            ...editForm,
+                            unitId: uId,
+                            ...(u?.finalPrice ? { budgetMax: u.finalPrice.toString() } : {}),
+                            ...(u?.unitType ? { propertyType: u.unitType } : {}),
+                          });
+                        }}
+                        className="flex-1 px-2.5 py-1.5 text-xs text-slate-800 bg-white border border-slate-300 rounded focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 shadow-xs"
+                      >
+                        <option value="">Pending Shortlisting / None</option>
+                        {unitsList
+                          .filter((u) => !editForm.projectId || u.projectId === editForm.projectId || u.id === editForm.unitId)
+                          .map((u) => (
+                            <option key={u.id} value={u.id}>
+                              Unit #{u.unitNumber} {u.building?.name ? `(${u.building.name})` : ""} - AED {u.finalPrice?.toLocaleString() || "N/A"}
+                            </option>
+                          ))}
+                      </select>
+                    ) : (
+                      <div className="flex-1 flex items-center justify-between gap-2 overflow-hidden">
+                        <span className="font-semibold text-slate-800 text-xs truncate">
+                          {lead.unit ? (
+                            `Unit #${lead.unit.unitNumber} ${lead.unit.building?.name ? `(${lead.unit.building.name})` : ""} - AED ${lead.unit.finalPrice?.toLocaleString() || "N/A"}`
+                          ) : (
+                            "Pending Shortlisting / None"
+                          )}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={handleStartInlineEdit}
+                          className="p-1 text-slate-300 hover:text-blue-600 group-hover:text-slate-500 rounded transition-colors"
+                          title="Edit Allocated Unit"
                         >
                           <Pencil className="w-3.5 h-3.5" />
                         </button>
@@ -2104,6 +2166,54 @@ export default function LeadDetailPage({
                           onChange={(e) => setConvertForm({ ...convertForm, opportunityName: e.target.value })}
                           className="w-full p-2 border border-slate-200 rounded-lg bg-white"
                         />
+                      </div>
+
+                      {/* Project Development & Allocated Unit */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-slate-600 font-medium mb-1">
+                            Project Development
+                          </label>
+                          <select
+                            value={convertForm.projectId}
+                            onChange={(e) => setConvertForm({ ...convertForm, projectId: e.target.value, unitId: "" })}
+                            className="w-full p-2 border border-slate-200 rounded-lg bg-white text-slate-800 text-xs"
+                          >
+                            <option value="">-- Select Project Development --</option>
+                            {projectsList.map((p) => (
+                              <option key={p.id} value={p.id}>
+                                {p.name} {p.code ? `(${p.code})` : ""}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-slate-600 font-medium mb-1">
+                            Allocated Unit
+                          </label>
+                          <select
+                            value={convertForm.unitId}
+                            onChange={(e) => {
+                              const uId = e.target.value;
+                              const un = unitsList.find((u) => u.id === uId);
+                              setConvertForm({
+                                ...convertForm,
+                                unitId: uId,
+                                ...(un?.finalPrice ? { opportunityAmount: un.finalPrice.toString() } : {}),
+                              });
+                            }}
+                            className="w-full p-2 border border-slate-200 rounded-lg bg-white text-slate-800 text-xs"
+                          >
+                            <option value="">-- Select Allocated Unit --</option>
+                            {unitsList
+                              .filter((u) => !convertForm.projectId || u.projectId === convertForm.projectId || u.id === convertForm.unitId)
+                              .map((u) => (
+                                <option key={u.id} value={u.id}>
+                                  Unit #{u.unitNumber} {u.building?.name ? `(${u.building.name})` : ""} - AED {u.finalPrice?.toLocaleString() || "N/A"}
+                                </option>
+                              ))}
+                          </select>
+                        </div>
                       </div>
                       <div className="grid grid-cols-2 gap-3">
                         <div>

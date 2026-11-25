@@ -23,7 +23,11 @@ export async function GET(
         },
         broker: true,
         project: true,
-        unit: true,
+        unit: {
+          include: {
+            building: true,
+          },
+        },
         activities: {
           orderBy: { createdAt: "desc" },
           take: 30,
@@ -85,6 +89,16 @@ export async function PATCH(
     if (body.budgetMin !== undefined) cleanData.budgetMin = body.budgetMin !== "" && body.budgetMin !== null ? Number(body.budgetMin) : null;
     if (body.budgetMax !== undefined) cleanData.budgetMax = body.budgetMax !== "" && body.budgetMax !== null ? Number(body.budgetMax) : null;
     if (body.nextFollowUpDate !== undefined) cleanData.nextFollowUpDate = body.nextFollowUpDate ? new Date(body.nextFollowUpDate) : null;
+    if (body.projectId !== undefined) cleanData.projectId = body.projectId || null;
+    if (body.unitId !== undefined) cleanData.unitId = body.unitId || null;
+    if (body.interestedProjectId !== undefined) {
+      cleanData.projectId = body.interestedProjectId || null;
+      delete cleanData.interestedProjectId;
+    }
+    if (cleanData.projectId) {
+      const proj = await prisma.project.findUnique({ where: { id: cleanData.projectId } });
+      if (proj) cleanData.interestedProject = proj.name;
+    }
 
     const updatedLead = await prisma.lead.update({
       where: { id },
