@@ -265,7 +265,10 @@ export default function LeadDetailPage({
       const res = await fetch(`/api/leads/${id}/convert`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(convertForm),
+        body: JSON.stringify({
+          ...convertForm,
+          leadData: lead,
+        }),
       });
       const data = await res.json();
       if (res.ok) {

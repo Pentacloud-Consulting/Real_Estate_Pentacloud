@@ -18,10 +18,64 @@ export async function POST(
     const { id } = await params;
     const body = await request.json().catch(() => ({}));
 
-    const lead = await prisma.lead.findUnique({
+    let lead = await prisma.lead.findUnique({
       where: { id },
       include: { activities: true, broker: true },
     });
+
+    const selectedBrokerId = body.brokerId || lead?.brokerId || body.leadData?.brokerId || null;
+
+    // Fallback hydration if lead was created on an isolated serverless lambda instance
+    if (!lead && body.leadData) {
+      const ld = body.leadData;
+      lead = await prisma.lead.upsert({
+        where: { id },
+        create: {
+          id,
+          leadNumber: ld.leadNumber || "LD-" + Date.now().toString().slice(-8),
+          firstName: ld.firstName || "",
+          lastName: ld.lastName || "Lead",
+          salutation: ld.salutation || null,
+          company: ld.company || body.accountName || null,
+          title: ld.title || null,
+          email: ld.email || null,
+          mobile: ld.mobile || "0000000000",
+          whatsapp: ld.whatsapp || null,
+          nationality: ld.nationality || null,
+          countryOfResidence: ld.countryOfResidence || "UAE",
+          preferredLanguage: ld.preferredLanguage || "English",
+          buyerType: ld.buyerType || "INDIVIDUAL",
+          rating: ld.rating || "WARM",
+          temperature: ld.temperature || "WARM",
+          status: ld.status || "NEW",
+          industry: ld.industry || null,
+          annualRevenue: ld.annualRevenue ? Number(ld.annualRevenue) : null,
+          employees: ld.employees ? parseInt(ld.employees, 10) : null,
+          website: ld.website || null,
+          street: ld.street || null,
+          city: ld.city || null,
+          state: ld.state || null,
+          country: ld.country || "UAE",
+          postalCode: ld.postalCode || null,
+          projectId: ld.projectId || null,
+          unitId: ld.unitId || null,
+          interestedProject: ld.interestedProject || null,
+          propertyType: ld.propertyType || "APARTMENT",
+          bedroomCount: ld.bedroomCount || null,
+          budgetMin: ld.budgetMin ? Number(ld.budgetMin) : null,
+          budgetMax: ld.budgetMax ? Number(ld.budgetMax) : null,
+          purchasePurpose: ld.purchasePurpose || "INVESTMENT",
+          expectedTimeline: ld.expectedTimeline || "Within 30 Days",
+          source: ld.source || "WEBSITE",
+          campaignName: ld.campaignName || null,
+          qualificationNotes: ld.qualificationNotes || null,
+          brokerId: selectedBrokerId,
+          assignedAdvisorId: ld.assignedAdvisorId || user.id,
+        },
+        update: {},
+        include: { activities: true, broker: true },
+      });
+    }
 
     if (!lead) return NextResponse.json({ error: "Lead not found" }, { status: 404 });
     if (lead.isConverted) {
@@ -30,9 +84,6 @@ export async function POST(
         { status: 400 }
       );
     }
-
-    // Determine target broker
-    const selectedBrokerId = body.brokerId || lead.brokerId || null;
 
     // Resolve project if any
     let project = null;
