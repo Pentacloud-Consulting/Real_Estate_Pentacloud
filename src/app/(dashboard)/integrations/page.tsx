@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
 import { Modal } from "@/components/ui/modal";
+import { ChannelLogo } from "@/components/integrations/channel-logo";
 
 interface IntegrationChannel {
   id: string;
@@ -132,6 +133,37 @@ const INTEGRATION_DEFINITIONS: IntegrationChannel[] = [
     ],
   },
   {
+    id: "whatzupp",
+    name: "WhatzUpp",
+    category: "social",
+    badge: "PentaCloud Official Product",
+    color: "#25D366",
+    lightBg: "bg-emerald-50/70",
+    borderColor: "border-emerald-200",
+    description:
+      "Connect your WhatzUpp WhatsApp Business messaging platform for instant lead capture, automated brochure dispatch, and two-way buyer conversations.",
+    features: [
+      "WhatsApp Business API Instant Lead Capture",
+      "Automated Floorplan & Brochure Dispatch",
+      "Two-Way Advisor Chat & Status Sync",
+      "Smart Broadcast & Follow-Up Sequences",
+    ],
+    connected: false,
+    lastSync: "Never",
+    syncedLeadsCount: 0,
+    config: {
+      businessPhone: "+971 50 000 0000",
+      workspaceId: "WZP-PC-001",
+      autoGreeting: true,
+      status: "DISCONNECTED",
+    },
+    fields: [
+      { key: "workspaceId", label: "WhatzUpp Workspace ID", placeholder: "e.g. WZP-PC-001" },
+      { key: "businessPhone", label: "WhatsApp Business Number", placeholder: "e.g. +971 50 000 0000" },
+      { key: "apiKey", label: "WhatzUpp API Secret Key", placeholder: "Enter WhatzUpp API key", type: "password" },
+    ],
+  },
+  {
     id: "dubizzle",
     name: "Dubizzle UAE",
     category: "portal",
@@ -230,10 +262,20 @@ const RECENT_SYNCED_LEADS = [
   {
     name: "Rashid Al-Maktoum",
     phone: "+971 50 847 2910",
+    source: "WhatzUpp",
+    badgeColor: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    project: "Downtown Crown Residences",
+    unit: "Unit #DCR-PH-01",
+    time: "2 mins ago",
+    status: "Auto-Assigned to Ahmed Al Rashid",
+  },
+  {
+    name: "Nadia Al-Mansoor",
+    phone: "+971 50 712 4890",
     source: "Property Finder",
     badgeColor: "bg-red-50 text-red-700 border-red-200",
-    project: "Downtown Heights Tower",
-    unit: "Unit #DHT-PH-02",
+    project: "Downtown Crown Residences",
+    unit: "Unit #DCR-0101",
     time: "4 mins ago",
     status: "Auto-Assigned to Ahmed Al Rashid",
   },
@@ -518,7 +560,7 @@ export default function IntegrationsPage() {
             activeTab === "social" ? "bg-blue-600 text-white shadow-xs" : "text-slate-600 hover:bg-slate-100"
           }`}
         >
-          Social & Paid Ads (3)
+          Social &amp; Messaging ({channels.filter((c) => c.category === "social").length})
         </button>
         <button
           onClick={() => setActiveTab("portal")}
@@ -526,7 +568,7 @@ export default function IntegrationsPage() {
             activeTab === "portal" ? "bg-blue-600 text-white shadow-xs" : "text-slate-600 hover:bg-slate-100"
           }`}
         >
-          UAE Property Portals (3)
+          UAE Property Portals ({channels.filter((c) => c.category === "portal").length})
         </button>
         <button
           onClick={() => setActiveTab("connected")}
@@ -568,18 +610,17 @@ export default function IntegrationsPage() {
               </div>
 
               <div className="flex items-center gap-3">
-                <div
-                  className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-sm shadow-xs"
-                  style={{ backgroundColor: ch.color }}
-                >
-                  {ch.name[0]}
-                </div>
+                <ChannelLogo id={ch.id} name={ch.name} />
                 <div>
                   <h3 className="text-base font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
                     {ch.name}
                   </h3>
                   <span className="text-[11px] text-slate-500 capitalize">
-                    {ch.category === "social" ? "Marketing & Lead Ads" : "UAE Listing Portal"}
+                    {ch.id === "whatzupp"
+                      ? "WhatsApp & Messaging Automation"
+                      : ch.category === "social"
+                      ? "Marketing & Lead Ads"
+                      : "UAE Listing Portal"}
                   </span>
                 </div>
               </div>

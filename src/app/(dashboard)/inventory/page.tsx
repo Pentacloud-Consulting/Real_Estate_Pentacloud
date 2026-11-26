@@ -104,7 +104,7 @@ export default function InventoryPage() {
   const [units, setUnits] = useState<UnitItem[]>([]);
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<"matrix" | "list">("matrix");
+  const [viewMode, setViewMode] = useState<"matrix" | "list">("list");
 
   // Filters
   const [selectedProject, setSelectedProject] = useState("");
@@ -462,7 +462,7 @@ export default function InventoryPage() {
                   return (
                     <button
                       key={u.id}
-                      onClick={() => setActiveUnit(u)}
+                      onClick={() => router.push(`/inventory/${u.id}`)}
                       className={`p-2.5 rounded-xl border text-left transition-all shadow-2xs hover:scale-102 cursor-pointer ${badgeBg}`}
                     >
                       <div className="flex items-center justify-between gap-3">
@@ -509,7 +509,13 @@ export default function InventoryPage() {
                   <tr key={u.id} className="hover:bg-[#F8FAFC] transition-colors">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1.5">
-                        <span className="font-mono font-bold text-[#2563EB]">{u.unitNumber}</span>
+                        <button
+                          type="button"
+                          onClick={() => router.push(`/inventory/${u.id}`)}
+                          className="font-mono font-bold text-[#2563EB] hover:text-blue-800 hover:underline cursor-pointer text-left"
+                        >
+                          {u.unitNumber}
+                        </button>
                         {u.images && u.images.length > 0 && (
                           <span className="text-[10px] text-slate-400 flex items-center gap-0.5" title={`${u.images.length} photos`}>
                             <Camera className="w-3 h-3 text-blue-500" />
@@ -546,8 +552,8 @@ export default function InventoryPage() {
                           Property Listing
                         </button>
                         <button
-                          onClick={() => setActiveUnit(u)}
-                          className="px-2.5 py-1 bg-white border border-[#E2E8F0] hover:bg-[#F8FAFC] rounded text-[11px] font-semibold text-[#172033] transition-colors cursor-pointer"
+                          onClick={() => router.push(`/inventory/${u.id}`)}
+                          className="px-2.5 py-1 bg-white border border-[#E2E8F0] hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 rounded text-[11px] font-semibold text-[#172033] transition-colors cursor-pointer"
                         >
                           Inspect
                         </button>
@@ -725,7 +731,7 @@ export default function InventoryPage() {
                   <div className="grid grid-cols-5 gap-2 pt-1">
                     {activeUnit.images.map((img, i) => (
                       <div key={i} className="relative aspect-4/3 rounded-lg overflow-hidden bg-slate-100 border border-slate-200">
-                        <Image src={img} alt="" fill sizes="100px" className="object-cover" />
+                        <Image src={img} alt="" fill unoptimized sizes="100px" className="object-cover" />
                         {i === 0 && (
                           <span className="absolute top-1 left-1 px-1 py-0.2 rounded text-[8px] font-bold bg-blue-600 text-white">
                             Cover
@@ -1025,6 +1031,7 @@ export default function InventoryPage() {
                 }
                 alt={previewListingUnit.unitNumber}
                 fill
+                unoptimized
                 sizes="(max-width: 768px) 100vw, 800px"
                 className="object-cover"
               />
@@ -1122,7 +1129,7 @@ export default function InventoryPage() {
                 <div className="grid grid-cols-5 gap-2">
                   {previewListingUnit.images.map((img, i) => (
                     <div key={i} className="relative aspect-4/3 rounded-lg overflow-hidden bg-slate-100 border border-slate-200">
-                      <Image src={img} alt="" fill sizes="100px" className="object-cover" />
+                      <Image src={img} alt="" fill unoptimized sizes="100px" className="object-cover" />
                     </div>
                   ))}
                 </div>
